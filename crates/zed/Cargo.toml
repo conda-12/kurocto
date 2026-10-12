@@ -276,7 +276,7 @@ repl = { workspace = true, features = ["test-support"] }
 
 
 [package.metadata.bundle-dev]
-icon = ["resources/app-icon-dev@2x.png", "resources/app-icon-dev.png"]
+icon = ["resources/app-icon-dev.icns"]
 identifier = "dev.kurocto.Kurocto-Dev"
 name = "Kurocto Dev"
 category = "Developer Tool"
@@ -285,7 +285,7 @@ osx_info_plist_exts = ["resources/info/*"]
 osx_url_schemes = ["kurocto"]
 
 [package.metadata.bundle-nightly]
-icon = ["resources/app-icon-nightly@2x.png", "resources/app-icon-nightly.png"]
+icon = ["resources/app-icon-nightly.icns"]
 identifier = "dev.kurocto.Kurocto-Nightly"
 name = "Kurocto Nightly"
 category = "Developer Tool"
@@ -294,7 +294,7 @@ osx_info_plist_exts = ["resources/info/*"]
 osx_url_schemes = ["kurocto"]
 
 [package.metadata.bundle-preview]
-icon = ["resources/app-icon-preview@2x.png", "resources/app-icon-preview.png"]
+icon = ["resources/app-icon-preview.icns"]
 identifier = "dev.kurocto.Kurocto-Preview"
 name = "Kurocto Preview"
 category = "Developer Tool"
@@ -303,7 +303,7 @@ osx_info_plist_exts = ["resources/info/*"]
 osx_url_schemes = ["kurocto"]
 
 [package.metadata.bundle-stable]
-icon = ["resources/app-icon@2x.png", "resources/app-icon.png"]
+icon = ["resources/app-icon.icns"]
 identifier = "dev.kurocto.Kurocto"
 name = "Kurocto"
 category = "Developer Tool"

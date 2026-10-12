@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+  <!-- Kurocto's app icon where the whole name cannot be read (64 pixels and under): its k, in the name's own
+       letters (Avenir Next Heavy Italic, as outlines). kurocto.svg is the icon above that. -->
+  <g transform="translate(100,100) scale(0.8046875)">
+    <rect x="4" y="4" width="1016" height="1016" rx="226" fill="#FFFFFF" stroke="#D4D4D2" stroke-width="8"/>
+    <g transform="translate(297.5,760) scale(4.4)">
+      <path fill="#0B0C0E" d="M38.5,-34.4 L32.7,-0.0 L-0.9,-0.0 L19.1,-113.4 L52.8,-113.4 L41.1,-48.8 L41.5,-48.8 L63.8,-78.9 L104.7,-78.9 L72.3,-41.4 L91.8,-0.0 L52.5,-0.0 L39.0,-34.4 Z"/>
+    </g>
+  </g>
+</svg>

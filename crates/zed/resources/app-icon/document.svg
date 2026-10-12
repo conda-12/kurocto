@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+  <!-- The icon of documents Kurocto opens: a page carrying the app icon's k. -->
+  <path d="M232,84 L640,84 L816,260 L816,900 Q816,940 776,940 L232,940 Q192,940 192,900 L192,124 Q192,84 232,84 Z" fill="#FFFFFF" stroke="#C9C9C7" stroke-width="10"/>
+  <path d="M640,84 L640,220 Q640,260 680,260 L816,260" fill="none" stroke="#C9C9C7" stroke-width="10"/>
+  <g transform="translate(372.4,730) scale(2.7)">
+    <path fill="#0B0C0E" d="M38.5,-34.4 L32.7,-0.0 L-0.9,-0.0 L19.1,-113.4 L52.8,-113.4 L41.1,-48.8 L41.5,-48.8 L63.8,-78.9 L104.7,-78.9 L72.3,-41.4 L91.8,-0.0 L52.5,-0.0 L39.0,-34.4 Z"/>
+  </g>
+</svg>
