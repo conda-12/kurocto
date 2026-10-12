@@ -24,8 +24,6 @@ use agent_settings::{
 };
 use anyhow::{Context as _, Result, anyhow};
 use chrono::{DateTime, Local, Utc};
-use client::UserStore;
-use cloud_api_types::Plan;
 use collections::{HashMap, HashSet, IndexMap};
 use fs::Fs;
 use futures::{
@@ -46,7 +44,7 @@ use language_model::{
     LanguageModelRequest, LanguageModelRequestMessage, LanguageModelRequestTool,
     LanguageModelToolResult, LanguageModelToolResultContent, LanguageModelToolUse,
     LanguageModelToolUseId, MessageContent, ProviderErrorCategory, Role, SelectedModel, Speed,
-    StopReason, TokenUsage, ZED_CLOUD_PROVIDER_ID,
+    StopReason, TokenUsage,
 };
 use project::{Project, trusted_worktrees::TrustedWorktrees};
 use prompt_store::ProjectContext;
@@ -68,6 +66,7 @@ use std::{
     time::{Duration, Instant},
 };
 use util::{ResultExt, debug_panic, markdown::MarkdownCodeBlock, paths::PathStyle};
+use web_search::WebSearchRegistry;
 use uuid::Uuid;
 
 const TOOL_CANCELED_MESSAGE: &str = "Tool canceled by user";
@@ -1296,7 +1295,6 @@ pub struct Thread {
     pending_summary_generation: Option<Shared<Task<Option<SharedString>>>>,
     summary: Option<SharedString>,
     messages: Vec<Arc<Message>>,
-    user_store: Entity<UserStore>,
     /// Holds the task that handles agent interaction until the end of the turn.
     /// Survives across multiple requests as the model performs tool calls and
     /// we run tools, report their results.
@@ -1453,7 +1451,6 @@ impl Thread {
             pending_summary_generation: None,
             summary: None,
             messages: Vec::new(),
-            user_store: project.read(cx).user_store(),
             running_turn: None,
             end_turn_at_next_boundary: false,
             pending_message: None,
@@ -1828,7 +1825,6 @@ impl Thread {
             pending_summary_generation: None,
             summary: db_thread.detailed_summary,
             messages: db_thread.messages,
-            user_store: project.read(cx).user_store(),
             running_turn: None,
             end_turn_at_next_boundary: false,
             pending_message: None,
@@ -3203,8 +3199,7 @@ impl Thread {
         cx: &mut AsyncApp,
     ) -> Result<ControlFlow<()>> {
         let retry = this.update(cx, |this, cx| {
-            let user_store = this.user_store.read(cx);
-            this.handle_completion_error(error, attempt, user_store.plan(), cx)
+            this.handle_completion_error(error, attempt, cx)
         })??;
         let timer = cx.background_executor().timer(retry.duration);
         event_stream.send_retry(retry);
@@ -3417,7 +3412,6 @@ impl Thread {
         &mut self,
         error: LanguageModelCompletionError,
         attempt: u8,
-        plan: Option<Plan>,
         cx: &mut Context<Self>,
     ) -> Result<acp_thread::RetryStatus> {
         if let LanguageModelCompletionError::ProviderRejection {
@@ -3428,17 +3422,7 @@ impl Thread {
             self.mark_token_limit_exceeded(*tokens, cx);
         }
 
-        let Some(model) = self.model() else {
-            return Err(anyhow!(error));
-        };
-
-        let auto_retry = if model.provider_id() == ZED_CLOUD_PROVIDER_ID {
-            plan.is_some()
-        } else {
-            true
-        };
-
-        if !auto_retry {
+        if self.model().is_none() {
             return Err(anyhow!(error));
         }
 
@@ -4270,10 +4254,18 @@ impl Thread {
         let is_restricted =
             TrustedWorktrees::has_restricted_worktrees(&self.project.read(cx).worktree_store(), cx);
 
+        // Web search has no built-in backend, so the tool is only useful once
+        // something has registered a provider.
+        let web_search_available = WebSearchRegistry::try_read_global(cx)
+            .is_some_and(|registry| registry.active_provider().is_some());
+
         let mut tools = self
             .tools
             .iter()
             .filter(|(_, tool)| !is_restricted || tool.allow_in_restricted_mode())
+            .filter(|(tool_name, _)| {
+                web_search_available || tool_name.as_ref() != WebSearchTool::NAME
+            })
             .filter_map(|(tool_name, tool)| {
                 let terminal_variant = matches!(
                     tool_name.as_ref(),

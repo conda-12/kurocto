@@ -1,9 +1,9 @@
 use std::sync::Arc;
 
 use anyhow::Result;
-use cloud_llm_client::WebSearchResponse;
 use collections::HashMap;
 use gpui::{App, AppContext as _, Context, Entity, Global, SharedString, Task};
+use serde::{Deserialize, Serialize};
 
 pub fn init(cx: &mut App) {
     let registry = cx.new(|_cx| WebSearchRegistry::default());
@@ -12,6 +12,18 @@ pub fn init(cx: &mut App) {
 
 #[derive(Clone, Eq, PartialEq, Hash, Debug, Ord, PartialOrd)]
 pub struct WebSearchProviderId(pub SharedString);
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct WebSearchResponse {
+    pub results: Vec<WebSearchResult>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct WebSearchResult {
+    pub title: String,
+    pub url: String,
+    pub text: String,
+}
 
 pub trait WebSearchProvider {
     fn id(&self) -> WebSearchProviderId;
@@ -35,6 +47,11 @@ impl WebSearchRegistry {
 
     pub fn read_global(cx: &App) -> &Self {
         cx.global::<GlobalWebSearchRegistry>().0.read(cx)
+    }
+
+    pub fn try_read_global(cx: &App) -> Option<&Self> {
+        cx.try_global::<GlobalWebSearchRegistry>()
+            .map(|registry| registry.0.read(cx))
     }
 
     pub fn providers(&self) -> impl Iterator<Item = &Arc<dyn WebSearchProvider>> {

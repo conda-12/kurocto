@@ -1199,15 +1199,17 @@
     // Maximum content width in pixels when limit_content_width is enabled.
     // Content will be centered within the panel.
     "max_content_width": 850,
-    // The default model to use when creating new threads.
-    "default_model": {
-      // The provider to use.
-      "provider": "zed.dev",
-      // The model to use.
-      "model": "claude-sonnet-4",
-      // Whether thinking is enabled.
-      "enable_thinking": false,
-    },
+    // The default model to use when creating new threads. When unset, the first
+    // model of a configured provider is used.
+    //
+    // "default_model": {
+    //   // The provider to use.
+    //   "provider": "anthropic",
+    //   // The model to use.
+    //   "model": "claude-sonnet-4",
+    //   // Whether thinking is enabled.
+    //   "enable_thinking": false,
+    // },
     // Additional parameters for language model requests. When making a request to a model, parameters will be taken
     // from the last entry in this list that matches the model's provider and name. In each entry, both provider
     // and model are optional, so that you can specify parameters for either one.
@@ -1225,7 +1227,7 @@
       //
       // To set parameters for a specific provider and model:
       // {
-      //   "provider": "zed.dev",
+      //   "provider": "anthropic",
       //   "model": "claude-sonnet-4",
       //   "temperature": 1.0
       // }
@@ -2698,7 +2700,6 @@
     "x_ai": {
       "api_url": "https://api.x.ai/v1",
     },
-    "zed.dev": {},
   },
   "session": {
     // Whether or not to restore unsaved buffers on restart.

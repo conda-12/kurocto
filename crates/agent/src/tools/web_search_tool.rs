@@ -3,17 +3,14 @@ use std::sync::Arc;
 use crate::{AgentTool, ToolCallEventStream, ToolInput};
 use agent_client_protocol::schema::v2 as acp;
 use anyhow::Result;
-use cloud_llm_client::WebSearchResponse;
 use futures::FutureExt as _;
 use gpui::{App, Task};
-use language_model::{
-    LanguageModelProviderId, LanguageModelToolResultContent, ZED_CLOUD_PROVIDER_ID,
-};
+use language_model::LanguageModelToolResultContent;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use ui::prelude::*;
 use util::markdown::MarkdownInlineCode;
-use web_search::WebSearchRegistry;
+use web_search::{WebSearchRegistry, WebSearchResponse};
 
 /// Search the web for information using your query.
 /// Use this when you need real-time information, facts, or data that might not be in your training.
@@ -60,11 +57,6 @@ impl AgentTool for WebSearchTool {
         _cx: &mut App,
     ) -> SharedString {
         "Searching the Web".into()
-    }
-
-    /// We currently only support Zed Cloud as a provider.
-    fn supports_provider(provider: &LanguageModelProviderId) -> bool {
-        provider == &ZED_CLOUD_PROVIDER_ID
     }
 
     fn run(
