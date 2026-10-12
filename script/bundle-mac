@@ -202,6 +202,9 @@ function sign_app_binaries() {
 
     echo "Downloading git binary"
     download_git "${target_triple}" "${app_path}/Contents/MacOS/git"
+    # Git is GPL-2.0 and the dugite-native archive ships without its license text.
+    curl --silent --fail --location "https://raw.githubusercontent.com/git/git/${GIT_VERSION}/COPYING" \
+        --output "${app_path}/Contents/Resources/LICENSE-GIT"
 
     # The GPL and Apache licenses require their text to accompany the binaries.
     cp LICENSE-GPL LICENSE-APACHE assets/licenses.md "${app_path}/Contents/Resources/"
