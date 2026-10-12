@@ -82,6 +82,8 @@ pub(crate) const MAX_REMOTE_SYNC_RETRY_DELAY: Duration = Duration::from_secs(60)
 pub(crate) const MAX_REMOTE_SYNC_ATTEMPTS: usize = 10;
 pub(crate) const REMOTE_SYNC_TIMEOUT: Duration = Duration::from_secs(60 * 60);
 
+pub const NO_EXTENSION_REGISTRY_MESSAGE: &str = "No extension registry is configured. Set `extension_registry_url` in your settings to install extensions from a registry.";
+
 pub(crate) fn remote_sync_retry_delay(attempts: usize) -> Duration {
     let exponential = REMOTE_SYNC_RETRY_DELAY * 2u32.saturating_pow(attempts.min(30) as u32);
     exponential.min(MAX_REMOTE_SYNC_RETRY_DELAY)
@@ -463,9 +465,11 @@ impl ExtensionStore {
 
         cx.spawn(async move |this, cx| {
             initial_index_load.await;
-            this.update(cx, |this, cx| this.auto_install_extensions(cx))
-                .ok();
-            this.update(cx, |this, cx| this.check_for_updates(cx)).ok();
+            this.update(cx, |this, cx| {
+                this.auto_install_extensions(cx);
+                this.check_for_updates(cx);
+            })
+            .ok();
         })
         .detach();
 
@@ -688,6 +692,11 @@ impl ExtensionStore {
         &mut self,
         cx: &mut Context<Self>,
     ) -> Task<Result<Vec<ExtensionMetadata>>> {
+        // Checked before the installed extension ids are gathered, so that they
+        // are never sent anywhere unless a registry has been configured.
+        if ExtensionSettings::get_global(cx).registry_url.is_none() {
+            return Task::ready(Err(anyhow!(NO_EXTENSION_REGISTRY_MESSAGE)));
+        }
         let schema_versions = schema_version_range();
         let wasm_api_versions = wasm_api_version_range(ReleaseChannel::global(cx));
         let extension_settings = ExtensionSettings::get_global(cx);
@@ -739,16 +748,13 @@ impl ExtensionStore {
         self.fetch_extensions_from_api(&format!("/extensions/{extension_id}"), &[], cx)
     }
 
-    /// Installs any extensions that should be included with Zed by default.
-    ///
-    /// This can be used to make certain functionality provided by extensions
-    /// available out-of-the-box.
+    /// Installs the extensions listed in the `auto_install_extensions` setting
+    /// from the configured extension registry.
     pub fn auto_install_extensions(&mut self, cx: &mut Context<Self>) {
-        if cfg!(test) {
+        let extension_settings = ExtensionSettings::get_global(cx);
+        if extension_settings.registry_url.is_none() {
             return;
         }
-
-        let extension_settings = ExtensionSettings::get_global(cx);
 
         let extensions_to_install = extension_settings
             .auto_install_extensions
@@ -764,18 +770,17 @@ impl ExtensionStore {
             .cloned()
             .collect::<Vec<_>>();
 
-        cx.spawn(async move |this, cx| {
-            for extension_id in extensions_to_install {
-                this.update(cx, |this, cx| {
-                    this.install_latest_extension(extension_id.clone(), cx);
-                })
-                .ok();
-            }
-        })
-        .detach();
+        for extension_id in extensions_to_install {
+            self.install_latest_extension(extension_id, cx)
+                .detach_and_log_err(cx);
+        }
     }
 
     pub fn check_for_updates(&mut self, cx: &mut Context<Self>) {
+        if ExtensionSettings::get_global(cx).registry_url.is_none() {
+            return;
+        }
+
         let task = self.fetch_extensions_with_update_available(cx);
         cx.spawn(async move |this, cx| Self::upgrade_extensions(this, task.await?, cx).await)
             .detach();
@@ -816,11 +821,14 @@ impl ExtensionStore {
         query: &[(&str, &str)],
         cx: &mut Context<ExtensionStore>,
     ) -> Task<Result<Vec<ExtensionMetadata>>> {
-        let url = self.http_client.build_zed_api_url(path, query);
+        let url = match Self::registry_url(path, query, cx) {
+            Ok(url) => url,
+            Err(error) => return Task::ready(Err(error)),
+        };
         let http_client = self.http_client.clone();
         cx.spawn(async move |_, _| {
             let mut response = http_client
-                .get(url?.as_ref(), AsyncBody::empty(), true)
+                .get(url.as_ref(), AsyncBody::empty(), true)
                 .await?;
 
             let mut body = Vec::new();
@@ -848,14 +856,29 @@ impl ExtensionStore {
         })
     }
 
+    /// Builds a URL on the configured extension registry.
+    ///
+    /// Fails when no registry is configured, which is what keeps every registry
+    /// operation from reaching the network in that case.
+    fn registry_url(path: &str, query: &[(&str, &str)], cx: &App) -> Result<Url> {
+        let registry_url = ExtensionSettings::get_global(cx)
+            .registry_url
+            .as_deref()
+            .context(NO_EXTENSION_REGISTRY_MESSAGE)?;
+
+        Ok(Url::parse_with_params(
+            &format!("{registry_url}{path}"),
+            query,
+        )?)
+    }
+
     pub fn install_extension(
         &mut self,
         extension_id: Arc<str>,
         version: Arc<str>,
         cx: &mut Context<Self>,
-    ) {
+    ) -> Task<Result<()>> {
         self.install_or_upgrade_extension(extension_id, version, ExtensionOperation::Install, cx)
-            .detach_and_log_err(cx);
     }
 
     fn install_or_upgrade_extension_at_endpoint(
@@ -972,29 +995,31 @@ impl ExtensionStore {
         })
     }
 
-    pub fn install_latest_extension(&mut self, extension_id: Arc<str>, cx: &mut Context<Self>) {
+    pub fn install_latest_extension(
+        &mut self,
+        extension_id: Arc<str>,
+        cx: &mut Context<Self>,
+    ) -> Task<Result<()>> {
         log::info!("installing extension {extension_id} latest version");
 
         let schema_versions = schema_version_range();
         let wasm_api_versions = wasm_api_version_range(ReleaseChannel::global(cx));
 
-        let Some(url) = self
-            .http_client
-            .build_zed_api_url(
-                &format!("/extensions/{extension_id}/download"),
-                &[
-                    ("min_schema_version", &schema_versions.start().to_string()),
-                    ("max_schema_version", &schema_versions.end().to_string()),
-                    (
-                        "min_wasm_api_version",
-                        &wasm_api_versions.start().to_string(),
-                    ),
-                    ("max_wasm_api_version", &wasm_api_versions.end().to_string()),
-                ],
-            )
-            .log_err()
-        else {
-            return;
+        let url = match Self::registry_url(
+            &format!("/extensions/{extension_id}/download"),
+            &[
+                ("min_schema_version", &schema_versions.start().to_string()),
+                ("max_schema_version", &schema_versions.end().to_string()),
+                (
+                    "min_wasm_api_version",
+                    &wasm_api_versions.start().to_string(),
+                ),
+                ("max_wasm_api_version", &wasm_api_versions.end().to_string()),
+            ],
+            cx,
+        ) {
+            Ok(url) => url,
+            Err(error) => return Task::ready(Err(error)),
         };
 
         self.install_or_upgrade_extension_at_endpoint(
@@ -1003,7 +1028,6 @@ impl ExtensionStore {
             ExtensionOperation::Install,
             cx,
         )
-        .detach_and_log_err(cx);
     }
 
     pub fn upgrade_extension(
@@ -1023,15 +1047,13 @@ impl ExtensionStore {
         cx: &mut Context<Self>,
     ) -> Task<Result<()>> {
         log::info!("installing extension {extension_id} {version}");
-        let Some(url) = self
-            .http_client
-            .build_zed_api_url(
-                &format!("/extensions/{extension_id}/{version}/download"),
-                &[],
-            )
-            .log_err()
-        else {
-            return Task::ready(Ok(()));
+        let url = match Self::registry_url(
+            &format!("/extensions/{extension_id}/{version}/download"),
+            &[],
+            cx,
+        ) {
+            Ok(url) => url,
+            Err(error) => return Task::ready(Err(error)),
         };
 
         self.install_or_upgrade_extension_at_endpoint(extension_id, url, operation, cx)

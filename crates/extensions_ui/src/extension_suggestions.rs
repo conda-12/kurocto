@@ -6,13 +6,12 @@ use extension_host::{ExtensionSettings, ExtensionStore};
 use extension_suggest::SuggestedExtension;
 use gpui::{App, AppContext as _, Context, Entity, SharedString};
 use language::{Buffer, PLAIN_TEXT};
-use markdown::{Markdown, MarkdownElement};
 use project::lsp_store::LspStoreEvent;
 use settings::Settings as _;
 use ui::prelude::*;
 use util::ResultExt;
 use workspace::notifications::{
-    NotificationId, markdown_style, simple_message_notification::MessageNotification,
+    DetachAndPromptErr as _, NotificationId, simple_message_notification::MessageNotification,
 };
 use workspace::{AppState, Event as WorkspaceEvent, Workspace};
 
@@ -111,68 +110,39 @@ fn suggest_for_buffer(
     let Some(file) = buffer.file().cloned() else {
         return;
     };
-    let language_name = buffer
+    if buffer
         .language()
-        .filter(|language| **language != *PLAIN_TEXT)
-        .map(|language| language.name());
-
-    match language_name {
-        Some(language_name) => {
-            let Some(suggestion) =
-                extension_suggest::additional_suggestion_for_language(language_name.as_ref())
-            else {
-                return;
-            };
-            show_suggestion(workspace, suggestion.extension_id, cx, |cx| {
-                let markdown = cx.new(|cx| {
-                    Markdown::new(
-                        SharedString::new_static(suggestion.description),
-                        None,
-                        None,
-                        cx,
-                    )
-                });
-                MessageNotification::new_from_builder(cx, move |window, cx| {
-                    MarkdownElement::new(markdown.clone(), markdown_style(window, cx))
-                        .text_size(TextSize::Default.rems(cx))
-                        .into_any_element()
-                })
-                .with_title(suggestion.title)
-                .more_info_message("Learn more")
-                .more_info_url(suggestion.docs_url)
-                .primary_message(suggestion.install_message)
-                .secondary_message("Don't show again")
-            });
-        }
-        None => {
-            let language_exists = workspace
-                .project()
-                .read(cx)
-                .languages()
-                .language_for_file(&file, Some(buffer.as_rope()), cx)
-                .is_some();
-            if language_exists {
-                return;
-            }
-            let Some(SuggestedExtension {
-                extension_id,
-                file_name_or_extension,
-            }) = extension_suggest::suggest_extension(file.path())
-            else {
-                return;
-            };
-            show_suggestion(workspace, &extension_id, cx, |cx| {
-                MessageNotification::new(
-                    format!(
-                        "Do you want to install the recommended '{extension_id}' extension for '{file_name_or_extension}' files?"
-                    ),
-                    cx,
-                )
-                .primary_message("Yes, install extension")
-                .secondary_message("No, don't install it")
-            });
-        }
+        .is_some_and(|language| *language != *PLAIN_TEXT)
+    {
+        return;
     }
+
+    let language_exists = workspace
+        .project()
+        .read(cx)
+        .languages()
+        .language_for_file(&file, Some(buffer.as_rope()), cx)
+        .is_some();
+    if language_exists {
+        return;
+    }
+    let Some(SuggestedExtension {
+        extension_id,
+        file_name_or_extension,
+    }) = extension_suggest::suggest_extension(file.path())
+    else {
+        return;
+    };
+    show_suggestion(workspace, &extension_id, cx, |cx| {
+        MessageNotification::new(
+            format!(
+                "Do you want to install the recommended '{extension_id}' extension for '{file_name_or_extension}' files?"
+            ),
+            cx,
+        )
+        .primary_message("Yes, install extension")
+        .secondary_message("No, don't install it")
+    });
 }
 
 fn is_active_in_some_pane(workspace: &Workspace, buffer: &Entity<Buffer>, cx: &App) -> bool {
@@ -196,7 +166,10 @@ fn show_suggestion(
     if workspace.has_notification(&notification_id) {
         return;
     }
-    if !ExtensionSettings::get_global(cx).suggest_extensions {
+    let extension_settings = ExtensionSettings::get_global(cx);
+    // Accepting a suggestion installs from the registry, so there is nothing to
+    // offer without one.
+    if !extension_settings.suggest_extensions || extension_settings.registry_url.is_none() {
         return;
     }
 
@@ -225,10 +198,17 @@ fn show_suggestion(
                 .primary_icon_color(Color::Success)
                 .primary_on_click({
                     let extension_id = extension_id.clone();
-                    move |_window, cx| {
-                        ExtensionStore::global(cx).update(cx, |store, cx| {
-                            store.install_latest_extension(extension_id.clone(), cx);
-                        });
+                    move |window, cx| {
+                        ExtensionStore::global(cx)
+                            .update(cx, |store, cx| {
+                                store.install_latest_extension(extension_id.clone(), cx)
+                            })
+                            .detach_and_prompt_err(
+                                "Failed to install extension",
+                                window,
+                                cx,
+                                |_, _, _| None,
+                            );
                     }
                 })
                 .secondary_icon(IconName::Close)
@@ -260,56 +240,13 @@ mod tests {
     use project::{Project, WorktreeId};
     use serde_json::json;
     use settings::SettingsStore;
+    use std::sync::atomic::{AtomicUsize, Ordering};
     use util::path;
     use util::rel_path::rel_path;
     use workspace::{AppState, SplitDirection};
 
-    const EMMET_EXTENSION_ID: &str = "emmet";
-
-    #[gpui::test]
-    async fn test_language_suggestion_for_supported_language(cx: &mut TestAppContext) {
-        let app_state = init_test(cx);
-        let (workspace, cx) = open_test_workspace(&app_state, cx).await;
-
-        open_file(&workspace, "index.html", cx).await;
-
-        assert_eq!(
-            notification_ids(&workspace, cx),
-            vec![notification_id(EMMET_EXTENSION_ID)]
-        );
-    }
-
-    #[gpui::test]
-    async fn test_language_suggestion_when_language_is_detected_after_editor(
-        cx: &mut TestAppContext,
-    ) {
-        let app_state = init_test(cx);
-        let (workspace, cx) = open_test_workspace(&app_state, cx).await;
-
-        open_file(&workspace, "main.rs", cx).await;
-        assert_eq!(notification_ids(&workspace, cx), Vec::new());
-
-        let (project, buffer) = workspace.read_with(cx, |workspace, cx| {
-            let editor = workspace.active_item_as::<Editor>(cx).unwrap();
-            let buffer = editor.read(cx).buffer().read(cx).as_singleton().unwrap();
-            (workspace.project().clone(), buffer)
-        });
-        let html = project
-            .read_with(cx, |project, _| {
-                project.languages().language_for_name("HTML")
-            })
-            .await
-            .unwrap();
-        project.update(cx, |project, cx| {
-            project.set_language_for_buffer(&buffer, html, cx);
-        });
-        cx.run_until_parked();
-
-        assert_eq!(
-            notification_ids(&workspace, cx),
-            vec![notification_id(EMMET_EXTENSION_ID)]
-        );
-    }
+    const SUGGESTED_EXTENSION_ID: &str = "gleam";
+    const REGISTRY_URL: &str = "https://registry.example.test";
 
     #[gpui::test]
     async fn test_no_suggestion_for_buffer_without_active_editor(cx: &mut TestAppContext) {
@@ -321,7 +258,7 @@ mod tests {
         let project = workspace.read_with(cx, |workspace, _| workspace.project().clone());
         project
             .update(cx, |project, cx| {
-                project.open_buffer((worktree_id, rel_path("index.html")), cx)
+                project.open_buffer((worktree_id, rel_path("main.gleam")), cx)
             })
             .await
             .unwrap();
@@ -341,6 +278,32 @@ mod tests {
     }
 
     #[gpui::test]
+    async fn test_no_suggestion_without_registry(cx: &mut TestAppContext) {
+        let app_state = init_test(cx);
+        let request_count = Arc::new(AtomicUsize::new(0));
+        app_state.client.http_client().as_fake().replace_handler({
+            let request_count = request_count.clone();
+            move |handler, request| {
+                request_count.fetch_add(1, Ordering::SeqCst);
+                handler(request)
+            }
+        });
+        cx.update(|cx| {
+            cx.update_global::<SettingsStore, _>(|store, cx| {
+                store.update_user_settings(cx, |content| {
+                    content.extension.extension_registry_url = None;
+                });
+            });
+        });
+        let (workspace, cx) = open_test_workspace(&app_state, cx).await;
+
+        open_file(&workspace, "main.gleam", cx).await;
+
+        assert_eq!(notification_ids(&workspace, cx), Vec::new());
+        assert_eq!(request_count.load(Ordering::SeqCst), 0);
+    }
+
+    #[gpui::test]
     async fn test_no_suggestion_when_suggest_extensions_disabled(cx: &mut TestAppContext) {
         let app_state = init_test(cx);
         cx.update(|cx| {
@@ -352,7 +315,6 @@ mod tests {
         });
         let (workspace, cx) = open_test_workspace(&app_state, cx).await;
 
-        open_file(&workspace, "index.html", cx).await;
         open_file(&workspace, "main.gleam", cx).await;
 
         assert_eq!(notification_ids(&workspace, cx), Vec::new());
@@ -362,10 +324,10 @@ mod tests {
     async fn test_disabling_extension_suggestions_stops_suggestions(cx: &mut TestAppContext) {
         let app_state = init_test(cx);
         let (workspace, cx) = open_test_workspace(&app_state, cx).await;
-        open_file(&workspace, "index.html", cx).await;
+        open_file(&workspace, "main.gleam", cx).await;
         assert_eq!(
             notification_ids(&workspace, cx),
-            vec![notification_id(EMMET_EXTENSION_ID)]
+            vec![notification_id(SUGGESTED_EXTENSION_ID)]
         );
 
         let notification = notification_views(&workspace, cx)
@@ -381,21 +343,21 @@ mod tests {
         assert_eq!(notification_ids(&workspace, cx), Vec::new());
         cx.update(|_, cx| {
             assert!(!ExtensionSettings::get_global(cx).suggest_extensions);
-            assert!(!suggestion_dismissed(EMMET_EXTENSION_ID, cx));
+            assert!(!suggestion_dismissed(SUGGESTED_EXTENSION_ID, cx));
         });
 
-        open_file(&workspace, "other.html", cx).await;
+        open_file(&workspace, "other.gleam", cx).await;
         assert_eq!(notification_ids(&workspace, cx), Vec::new());
     }
 
     #[gpui::test]
     async fn test_no_suggestion_after_dismissal(cx: &mut TestAppContext) {
         let app_state = init_test(cx);
-        cx.update(|cx| dismiss_suggestion(EMMET_EXTENSION_ID, cx));
+        cx.update(|cx| dismiss_suggestion(SUGGESTED_EXTENSION_ID, cx));
         cx.run_until_parked();
         let (workspace, cx) = open_test_workspace(&app_state, cx).await;
 
-        open_file(&workspace, "index.html", cx).await;
+        open_file(&workspace, "main.gleam", cx).await;
 
         assert_eq!(notification_ids(&workspace, cx), Vec::new());
     }
@@ -405,19 +367,19 @@ mod tests {
         let app_state = init_test(cx);
         let (workspace, cx) = open_test_workspace(&app_state, cx).await;
 
-        open_file(&workspace, "index.html", cx).await;
+        open_file(&workspace, "main.gleam", cx).await;
         assert_eq!(
             notification_ids(&workspace, cx),
-            vec![notification_id(EMMET_EXTENSION_ID)]
+            vec![notification_id(SUGGESTED_EXTENSION_ID)]
         );
 
-        cx.update(|_, cx| dismiss_suggestion(EMMET_EXTENSION_ID, cx));
+        cx.update(|_, cx| dismiss_suggestion(SUGGESTED_EXTENSION_ID, cx));
         cx.run_until_parked();
         workspace.update(cx, |workspace, cx| {
-            workspace.dismiss_notification(&notification_id(EMMET_EXTENSION_ID), cx)
+            workspace.dismiss_notification(&notification_id(SUGGESTED_EXTENSION_ID), cx)
         });
 
-        open_file(&workspace, "other.html", cx).await;
+        open_file(&workspace, "other.gleam", cx).await;
 
         assert_eq!(notification_ids(&workspace, cx), Vec::new());
     }
@@ -425,10 +387,10 @@ mod tests {
     #[gpui::test]
     async fn test_no_suggestion_when_installed(cx: &mut TestAppContext) {
         let app_state = init_test(cx);
-        install_emmet_on_disk(&app_state, cx).await;
+        install_suggested_extension_on_disk(&app_state, cx).await;
         let (workspace, cx) = open_test_workspace(&app_state, cx).await;
 
-        open_file(&workspace, "index.html", cx).await;
+        open_file(&workspace, "main.gleam", cx).await;
 
         assert_eq!(notification_ids(&workspace, cx), Vec::new());
     }
@@ -438,18 +400,18 @@ mod tests {
         let app_state = init_test(cx);
         let (workspace, cx) = open_test_workspace(&app_state, cx).await;
         let (other_workspace, cx) = open_test_workspace(&app_state, cx).await;
-        open_file(&workspace, "index.html", cx).await;
-        open_file(&other_workspace, "index.html", cx).await;
+        open_file(&workspace, "main.gleam", cx).await;
+        open_file(&other_workspace, "main.gleam", cx).await;
         assert_eq!(
             notification_ids(&workspace, cx),
-            vec![notification_id(EMMET_EXTENSION_ID)]
+            vec![notification_id(SUGGESTED_EXTENSION_ID)]
         );
         assert_eq!(
             notification_ids(&other_workspace, cx),
-            vec![notification_id(EMMET_EXTENSION_ID)]
+            vec![notification_id(SUGGESTED_EXTENSION_ID)]
         );
 
-        cx.update(|_, cx| dismiss_suggestion(EMMET_EXTENSION_ID, cx));
+        cx.update(|_, cx| dismiss_suggestion(SUGGESTED_EXTENSION_ID, cx));
         cx.run_until_parked();
 
         assert_eq!(notification_ids(&workspace, cx), Vec::new());
@@ -461,11 +423,11 @@ mod tests {
         let app_state = init_test(cx);
         let (workspace, cx) = open_test_workspace(&app_state, cx).await;
 
-        open_file(&workspace, "index.html", cx).await;
+        open_file(&workspace, "main.gleam", cx).await;
         let shown = notification_views(&workspace, cx);
         assert_eq!(shown.len(), 1);
 
-        install_extension_on_disk("gleam", &app_state, cx).await;
+        install_extension_on_disk("zig", &app_state, cx).await;
 
         let still_shown = notification_views(&workspace, cx);
         assert_eq!(still_shown.len(), 1);
@@ -479,13 +441,13 @@ mod tests {
         let app_state = init_test(cx);
         let (workspace, cx) = open_test_workspace(&app_state, cx).await;
 
-        open_file(&workspace, "index.html", cx).await;
+        open_file(&workspace, "main.gleam", cx).await;
         assert_eq!(
             notification_ids(&workspace, cx),
-            vec![notification_id(EMMET_EXTENSION_ID)]
+            vec![notification_id(SUGGESTED_EXTENSION_ID)]
         );
 
-        install_emmet_on_disk(&app_state, cx).await;
+        install_suggested_extension_on_disk(&app_state, cx).await;
 
         assert_eq!(notification_ids(&workspace, cx), Vec::new());
     }
@@ -493,10 +455,10 @@ mod tests {
     #[gpui::test]
     async fn test_suggestion_returns_after_uninstall(cx: &mut TestAppContext) {
         let app_state = init_test(cx);
-        install_emmet_on_disk(&app_state, cx).await;
+        install_suggested_extension_on_disk(&app_state, cx).await;
         let (workspace, cx) = open_test_workspace(&app_state, cx).await;
 
-        open_file(&workspace, "index.html", cx).await;
+        open_file(&workspace, "main.gleam", cx).await;
         assert_eq!(notification_ids(&workspace, cx), Vec::new());
 
         app_state
@@ -504,7 +466,7 @@ mod tests {
             .remove_dir(
                 &paths::extensions_dir()
                     .join("installed")
-                    .join(EMMET_EXTENSION_ID),
+                    .join(SUGGESTED_EXTENSION_ID),
                 RemoveOptions {
                     recursive: true,
                     ignore_if_not_exists: false,
@@ -524,11 +486,11 @@ mod tests {
                 Vec::<&Arc<str>>::new()
             );
         });
-        open_file(&workspace, "other.html", cx).await;
+        open_file(&workspace, "other.gleam", cx).await;
 
         assert_eq!(
             notification_ids(&workspace, cx),
-            vec![notification_id(EMMET_EXTENSION_ID)]
+            vec![notification_id(SUGGESTED_EXTENSION_ID)]
         );
     }
 
@@ -542,7 +504,9 @@ mod tests {
             .replace_handler(|_, _| std::future::pending());
         cx.update(|cx| {
             ExtensionStore::global(cx).update(cx, |store, cx| {
-                store.install_latest_extension(Arc::from(EMMET_EXTENSION_ID), cx);
+                store
+                    .install_latest_extension(Arc::from(SUGGESTED_EXTENSION_ID), cx)
+                    .detach_and_log_err(cx);
             });
         });
         cx.run_until_parked();
@@ -553,12 +517,12 @@ mod tests {
                     .outstanding_operations()
                     .keys()
                     .collect::<Vec<_>>(),
-                vec![&Arc::from(EMMET_EXTENSION_ID)]
+                vec![&Arc::from(SUGGESTED_EXTENSION_ID)]
             );
         });
         let (workspace, cx) = open_test_workspace(&app_state, cx).await;
 
-        open_file(&workspace, "index.html", cx).await;
+        open_file(&workspace, "main.gleam", cx).await;
 
         assert_eq!(notification_ids(&workspace, cx), Vec::new());
     }
@@ -568,7 +532,9 @@ mod tests {
         let app_state = init_test(cx);
         cx.update(|cx| {
             ExtensionStore::global(cx).update(cx, |store, cx| {
-                store.install_latest_extension(Arc::from(EMMET_EXTENSION_ID), cx);
+                store
+                    .install_latest_extension(Arc::from(SUGGESTED_EXTENSION_ID), cx)
+                    .detach_and_log_err(cx);
             });
         });
         cx.run_until_parked();
@@ -580,26 +546,26 @@ mod tests {
         });
         let (workspace, cx) = open_test_workspace(&app_state, cx).await;
 
-        open_file(&workspace, "index.html", cx).await;
+        open_file(&workspace, "main.gleam", cx).await;
 
         assert_eq!(
             notification_ids(&workspace, cx),
-            vec![notification_id(EMMET_EXTENSION_ID)]
+            vec![notification_id(SUGGESTED_EXTENSION_ID)]
         );
     }
 
     #[gpui::test]
     async fn test_suggestion_returns_after_uninstall_through_store(cx: &mut TestAppContext) {
         let app_state = init_test(cx);
-        install_emmet_on_disk(&app_state, cx).await;
+        install_suggested_extension_on_disk(&app_state, cx).await;
         let (workspace, cx) = open_test_workspace(&app_state, cx).await;
 
-        open_file(&workspace, "index.html", cx).await;
+        open_file(&workspace, "main.gleam", cx).await;
         assert_eq!(notification_ids(&workspace, cx), Vec::new());
 
         let uninstall = cx.update(|_, cx| {
             ExtensionStore::global(cx).update(cx, |store, cx| {
-                store.uninstall_extension(Arc::from(EMMET_EXTENSION_ID), cx)
+                store.uninstall_extension(Arc::from(SUGGESTED_EXTENSION_ID), cx)
             })
         });
         cx.executor().advance_clock(RELOAD_DEBOUNCE_DURATION * 4);
@@ -607,11 +573,11 @@ mod tests {
         cx.run_until_parked();
         assert_eq!(notification_ids(&workspace, cx), Vec::new());
 
-        open_file(&workspace, "other.html", cx).await;
+        open_file(&workspace, "other.gleam", cx).await;
 
         assert_eq!(
             notification_ids(&workspace, cx),
-            vec![notification_id(EMMET_EXTENSION_ID)]
+            vec![notification_id(SUGGESTED_EXTENSION_ID)]
         );
     }
 
@@ -627,7 +593,7 @@ mod tests {
     async fn test_suggestion_when_auto_install_is_disabled(cx: &mut TestAppContext) {
         assert_eq!(
             suggestions_with_auto_install_setting(false, cx).await,
-            vec![notification_id(EMMET_EXTENSION_ID)]
+            vec![notification_id(SUGGESTED_EXTENSION_ID)]
         );
     }
 
@@ -636,11 +602,11 @@ mod tests {
         let app_state = init_test(cx);
         let (workspace, cx) = open_test_workspace(&app_state, cx).await;
 
-        open_file(&workspace, "index.html", cx).await;
+        open_file(&workspace, "main.gleam", cx).await;
         let shown = notification_views(&workspace, cx);
         assert_eq!(shown.len(), 1);
 
-        open_file(&workspace, "other.html", cx).await;
+        open_file(&workspace, "other.gleam", cx).await;
 
         let still_shown = notification_views(&workspace, cx);
         assert_eq!(still_shown.len(), 1);
@@ -652,7 +618,7 @@ mod tests {
         let app_state = init_test(cx);
         let (workspace, cx) = open_test_workspace(&app_state, cx).await;
 
-        open_file(&workspace, "index.html", cx).await;
+        open_file(&workspace, "main.gleam", cx).await;
         let notification = notification_views(&workspace, cx)
             .pop()
             .unwrap()
@@ -662,13 +628,13 @@ mod tests {
         notification.update(cx, |notification, cx| notification.dismiss(cx));
         cx.run_until_parked();
         assert_eq!(notification_ids(&workspace, cx), Vec::new());
-        assert!(!cx.update(|_, cx| suggestion_dismissed(EMMET_EXTENSION_ID, cx)));
+        assert!(!cx.update(|_, cx| suggestion_dismissed(SUGGESTED_EXTENSION_ID, cx)));
 
-        open_file(&workspace, "other.html", cx).await;
+        open_file(&workspace, "other.gleam", cx).await;
 
         assert_eq!(
             notification_ids(&workspace, cx),
-            vec![notification_id(EMMET_EXTENSION_ID)]
+            vec![notification_id(SUGGESTED_EXTENSION_ID)]
         );
     }
 
@@ -694,7 +660,7 @@ mod tests {
         let project = workspace.read_with(cx, |workspace, _| workspace.project().clone());
         let buffer = project
             .update(cx, |project, cx| {
-                project.open_buffer((worktree_id, rel_path("index.html")), cx)
+                project.open_buffer((worktree_id, rel_path("main.gleam")), cx)
             })
             .await
             .unwrap();
@@ -710,7 +676,7 @@ mod tests {
         );
         assert_eq!(
             notification_ids(&workspace, cx),
-            vec![notification_id(EMMET_EXTENSION_ID)]
+            vec![notification_id(SUGGESTED_EXTENSION_ID)]
         );
     }
 
@@ -789,10 +755,7 @@ mod tests {
             AppState::set_global(app_state.clone(), cx);
             cx.update_global::<SettingsStore, _>(|store, cx| {
                 store.update_user_settings(cx, |content| {
-                    content
-                        .extension
-                        .auto_install_extensions
-                        .insert(Arc::from("html"), false);
+                    content.extension.extension_registry_url = Some(REGISTRY_URL.to_string());
                 });
             });
             cx.set_global(db::AppDatabase::test_new());
@@ -811,8 +774,11 @@ mod tests {
         })
     }
 
-    async fn install_emmet_on_disk(app_state: &Arc<AppState>, cx: &mut TestAppContext) {
-        install_extension_on_disk(EMMET_EXTENSION_ID, app_state, cx).await;
+    async fn install_suggested_extension_on_disk(
+        app_state: &Arc<AppState>,
+        cx: &mut TestAppContext,
+    ) {
+        install_extension_on_disk(SUGGESTED_EXTENSION_ID, app_state, cx).await;
     }
 
     async fn install_extension_on_disk(
@@ -852,18 +818,14 @@ mod tests {
         fs.insert_tree(
             path!("/root"),
             json!({
-                "index.html": "<div></div>",
-                "other.html": "<span></span>",
                 "main.rs": "fn main() {}",
                 "main.gleam": "pub fn main() {}",
+                "other.gleam": "pub fn other() {}",
             }),
         )
         .await;
         let project = Project::test(fs, [path!("/root").as_ref()], cx).await;
         project.read_with(cx, |project, _| {
-            project
-                .languages()
-                .add(Arc::new(test_language("HTML", "html")));
             project
                 .languages()
                 .add(Arc::new(test_language("Rust", "rs")));
@@ -908,13 +870,13 @@ mod tests {
                     content
                         .extension
                         .auto_install_extensions
-                        .insert(Arc::from(EMMET_EXTENSION_ID), auto_install);
+                        .insert(Arc::from(SUGGESTED_EXTENSION_ID), auto_install);
                 });
             });
         });
         let (workspace, cx) = open_test_workspace(&app_state, cx).await;
 
-        open_file(&workspace, "index.html", cx).await;
+        open_file(&workspace, "main.gleam", cx).await;
 
         notification_ids(&workspace, cx)
     }

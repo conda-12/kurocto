@@ -50,7 +50,7 @@ use util::{
 };
 use workspace::{
     AppState, DismissDecision, ModalView, MultiWorkspace, OpenLog, OpenOptions, Toast, Workspace,
-    notifications::{DetachAndPromptErr, NotificationId},
+    notifications::{DetachAndPromptErr, NotificationId, NotifyResultExt as _},
     open_remote_project_with_existing_connection,
 };
 
@@ -2279,7 +2279,13 @@ impl RemoteServerProjects {
                 ExtensionStore::global(cx).update(cx, |this, cx| {
                     for extension in &dev_container_connection.extension_ids {
                         log::info!("Installing extension {extension} from devcontainer");
-                        this.install_latest_extension(Arc::from(extension.clone()), cx);
+                        let install =
+                            this.install_latest_extension(Arc::from(extension.clone()), cx);
+                        cx.spawn(async move |_, cx| {
+                            let result = install.await;
+                            cx.update(|cx| result.notify_app_err(cx));
+                        })
+                        .detach();
                     }
                 })
             })

@@ -2041,13 +2041,13 @@ async fn resolve_auth_required(
                 && !has_preregistered_client_id
             {
                 log::error!(
-                    "{id} authorization server supports neither CIMD nor DCR, \
+                    "{id} authorization server does not support dynamic client registration, \
                      and no pre-registered client_id is configured"
                 );
                 return ContextServerState::Error {
                     configuration,
                     server,
-                    error: "Authorization server supports neither CIMD nor DCR. \
+                    error: "Authorization server does not support dynamic client registration. \
                             Configure a pre-registered client_id in your settings \
                             under the \"oauth\" key."
                         .into(),

@@ -227,45 +227,6 @@ const SUGGESTIONS_BY_EXTENSION_ID: &[(&str, &[&str])] = &[
     ("zig", &["zig", "zon"]),
 ];
 
-pub struct LanguageAdditionSuggestion {
-    pub extension_id: &'static str,
-    pub languages: &'static [&'static str],
-    pub title: &'static str,
-    pub description: &'static str,
-    pub docs_url: &'static str,
-    pub install_message: &'static str,
-}
-
-const SUGGESTIONS_BY_LANGUAGE: &[LanguageAdditionSuggestion] = &[LanguageAdditionSuggestion {
-    extension_id: "emmet",
-    languages: &[
-        "Angular",
-        "Blade",
-        "CSS",
-        "Django",
-        "ERB",
-        "Elixir",
-        "HEEx",
-        "HTML",
-        "HTML+ERB",
-        "JavaScript",
-        "Jinja2",
-        "LESS",
-        "Liquid",
-        "Nunjucks",
-        "PHP",
-        "SCSS",
-        "Statamic Antlers",
-        "TSX",
-        "Twig",
-        "Vue.js",
-    ],
-    title: "Emmet is available for this file",
-    description: "Emmet expands abbreviations such as `ul>li*3` into HTML and `m10` into CSS.",
-    docs_url: "https://zed.dev/docs/languages/emmet",
-    install_message: "Install Emmet",
-}];
-
 fn suggested_extensions() -> &'static HashMap<&'static str, Arc<str>> {
     static SUGGESTIONS_BY_PATH_SUFFIX: OnceLock<HashMap<&str, Arc<str>>> = OnceLock::new();
     SUGGESTIONS_BY_PATH_SUFFIX.get_or_init(|| {
@@ -310,14 +271,6 @@ pub fn suggest_extension(path: &RelPath) -> Option<SuggestedExtension> {
         extension_id: extension_id.clone(),
         file_name_or_extension,
     })
-}
-
-pub fn additional_suggestion_for_language(
-    language_name: &str,
-) -> Option<&LanguageAdditionSuggestion> {
-    SUGGESTIONS_BY_LANGUAGE
-        .iter()
-        .find(|suggestion| suggestion.languages.contains(&language_name))
 }
 
 #[cfg(test)]

@@ -9,12 +9,18 @@ use util::serde::default_true;
 #[with_fallible_options]
 #[derive(Debug, PartialEq, Clone, Serialize, Deserialize, JsonSchema, MergeFrom)]
 pub struct ExtensionSettingsContent {
-    /// The extensions that should be automatically installed by Zed.
+    /// The base URL of the extension registry used to browse, install and update extensions.
     ///
-    /// This is used to make functionality provided by extensions (e.g., language support)
-    /// available out-of-the-box.
+    /// When unset, no extension registry is contacted and extensions can only be
+    /// installed from a local directory.
     ///
-    /// Default: { "html": true }
+    /// Default: null
+    pub extension_registry_url: Option<String>,
+    /// The extensions that should be automatically installed from the extension registry.
+    ///
+    /// Nothing is installed unless `extension_registry_url` is set.
+    ///
+    /// Default: {}
     #[serde(default)]
     pub auto_install_extensions: HashMap<Arc<str>, bool>,
     #[serde(default)]
@@ -31,6 +37,7 @@ pub struct ExtensionSettingsContent {
 impl Default for ExtensionSettingsContent {
     fn default() -> Self {
         Self {
+            extension_registry_url: None,
             auto_install_extensions: HashMap::default(),
             auto_update_extensions: HashMap::default(),
             suggest_extensions: true,

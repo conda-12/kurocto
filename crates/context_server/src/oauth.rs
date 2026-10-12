@@ -33,9 +33,6 @@ use std::sync::Arc;
 use std::time::{Duration, SystemTime};
 use url::Url;
 
-/// The CIMD URL where Zed's OAuth client metadata document is hosted.
-pub const CIMD_URL: &str = "https://zed.dev/oauth/client-metadata.json";
-
 /// Validate that a URL is safe to use as an OAuth endpoint.
 ///
 /// OAuth endpoints carry sensitive material (authorization codes, PKCE
@@ -148,10 +145,9 @@ pub struct AuthServerMetadata {
     pub scopes_supported: Option<Vec<String>>,
     pub grant_types_supported: Option<Vec<String>>,
     pub code_challenge_methods_supported: Option<Vec<String>>,
-    pub client_id_metadata_document_supported: bool,
 }
 
-/// The result of client registration — either CIMD or DCR.
+/// The result of client registration.
 #[derive(Clone, Serialize, Deserialize)]
 pub struct OAuthClientRegistration {
     pub client_id: String,
@@ -499,24 +495,21 @@ pub fn select_scopes(
 /// The registration approach to use, determined from auth server metadata.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ClientRegistrationStrategy {
-    /// The auth server supports CIMD. Use the CIMD URL as client_id directly.
-    Cimd { client_id: String },
     /// The auth server has a registration endpoint. Caller must POST to it.
     Dcr { registration_endpoint: Url },
     /// No supported registration mechanism.
     Unavailable,
 }
 
-/// Determine how to register with the authorization server, following the
-/// spec's recommended priority: CIMD first, DCR fallback.
+/// Determine how to register with the authorization server.
+///
+/// Client ID Metadata Documents are deliberately not used, even when the server
+/// supports them: they require a metadata document hosted at a stable URL, and
+/// there is none for this application.
 pub fn determine_registration_strategy(
     auth_server_metadata: &AuthServerMetadata,
 ) -> ClientRegistrationStrategy {
-    if auth_server_metadata.client_id_metadata_document_supported {
-        ClientRegistrationStrategy::Cimd {
-            client_id: CIMD_URL.to_string(),
-        }
-    } else if let Some(ref endpoint) = auth_server_metadata.registration_endpoint {
+    if let Some(ref endpoint) = auth_server_metadata.registration_endpoint {
         ClientRegistrationStrategy::Dcr {
             registration_endpoint: endpoint.clone(),
         }
@@ -725,7 +718,7 @@ pub fn dcr_registration_body(
     };
 
     let mut body = serde_json::json!({
-        "client_name": "Zed",
+        "client_name": "Kurocto",
         "redirect_uris": [redirect_uri],
         "grant_types": grant_types,
         "response_types": ["code"],
@@ -843,9 +836,6 @@ pub async fn fetch_auth_server_metadata(
                     registration_endpoint: response.registration_endpoint,
                     scopes_supported: response.scopes_supported,
                     code_challenge_methods_supported: response.code_challenge_methods_supported,
-                    client_id_metadata_document_supported: response
-                        .client_id_metadata_document_supported
-                        .unwrap_or(false),
                 });
             }
             Err(err) => {
@@ -896,19 +886,14 @@ pub async fn discover(
 
 /// Resolve the OAuth client registration for an authorization flow.
 ///
-/// CIMD uses the static client metadata document directly. For DCR, a fresh
-/// registration is performed each time because the loopback redirect URI
-/// includes an ephemeral port that changes every flow.
+/// A fresh dynamic client registration is performed each time because the
+/// loopback redirect URI includes an ephemeral port that changes every flow.
 pub async fn resolve_client_registration(
     http_client: &Arc<dyn HttpClient>,
     discovery: &OAuthDiscovery,
     redirect_uri: &str,
 ) -> Result<OAuthClientRegistration> {
     match determine_registration_strategy(&discovery.auth_server_metadata) {
-        ClientRegistrationStrategy::Cimd { client_id } => Ok(OAuthClientRegistration {
-            client_id,
-            client_secret: None,
-        }),
         ClientRegistrationStrategy::Dcr {
             registration_endpoint,
         } => {
@@ -925,7 +910,7 @@ pub async fn resolve_client_registration(
             .await
         }
         ClientRegistrationStrategy::Unavailable => {
-            bail!("authorization server supports neither CIMD nor DCR")
+            bail!("authorization server does not support dynamic client registration")
         }
     }
 }
@@ -1174,8 +1159,6 @@ struct AuthServerMetadataResponse {
     grant_types_supported: Option<Vec<String>>,
     #[serde(default)]
     code_challenge_methods_supported: Option<Vec<String>>,
-    #[serde(default)]
-    client_id_metadata_document_supported: Option<bool>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -1667,27 +1650,7 @@ mod tests {
     // -- Client registration strategy tests ----------------------------------
 
     #[test]
-    fn test_registration_strategy_prefers_cimd() {
-        let metadata = AuthServerMetadata {
-            issuer: Url::parse("https://auth.example.com").unwrap(),
-            authorization_endpoint: Url::parse("https://auth.example.com/authorize").unwrap(),
-            token_endpoint: Url::parse("https://auth.example.com/token").unwrap(),
-            registration_endpoint: Some(Url::parse("https://auth.example.com/register").unwrap()),
-            scopes_supported: None,
-            code_challenge_methods_supported: Some(vec!["S256".into()]),
-            client_id_metadata_document_supported: true,
-            grant_types_supported: None,
-        };
-        assert_eq!(
-            determine_registration_strategy(&metadata),
-            ClientRegistrationStrategy::Cimd {
-                client_id: CIMD_URL.to_string(),
-            }
-        );
-    }
-
-    #[test]
-    fn test_registration_strategy_falls_back_to_dcr() {
+    fn test_registration_strategy_uses_dcr() {
         let reg_endpoint = Url::parse("https://auth.example.com/register").unwrap();
         let metadata = AuthServerMetadata {
             issuer: Url::parse("https://auth.example.com").unwrap(),
@@ -1696,7 +1659,6 @@ mod tests {
             registration_endpoint: Some(reg_endpoint.clone()),
             scopes_supported: None,
             code_challenge_methods_supported: Some(vec!["S256".into()]),
-            client_id_metadata_document_supported: false,
             grant_types_supported: None,
         };
         assert_eq!(
@@ -1716,7 +1678,6 @@ mod tests {
             registration_endpoint: None,
             scopes_supported: None,
             code_challenge_methods_supported: Some(vec!["S256".into()]),
-            client_id_metadata_document_supported: false,
             grant_types_supported: None,
         };
         assert_eq!(
@@ -1773,7 +1734,6 @@ mod tests {
             registration_endpoint: None,
             scopes_supported: None,
             code_challenge_methods_supported: Some(vec!["S256".into()]),
-            client_id_metadata_document_supported: true,
             grant_types_supported: None,
         };
         let pkce = PkceChallenge {
@@ -1782,7 +1742,7 @@ mod tests {
         };
         let url = build_authorization_url(
             &metadata,
-            "https://zed.dev/oauth/client-metadata.json",
+            "client_abc",
             "http://127.0.0.1:12345/callback",
             &["files:read".into(), "files:write".into()],
             "https://mcp.example.com",
@@ -1792,10 +1752,7 @@ mod tests {
 
         let pairs: std::collections::HashMap<_, _> = url.query_pairs().collect();
         assert_eq!(pairs.get("response_type").unwrap(), "code");
-        assert_eq!(
-            pairs.get("client_id").unwrap(),
-            "https://zed.dev/oauth/client-metadata.json"
-        );
+        assert_eq!(pairs.get("client_id").unwrap(), "client_abc");
         assert_eq!(
             pairs.get("redirect_uri").unwrap(),
             "http://127.0.0.1:12345/callback"
@@ -1816,7 +1773,6 @@ mod tests {
             registration_endpoint: None,
             scopes_supported: None,
             code_challenge_methods_supported: Some(vec!["S256".into()]),
-            client_id_metadata_document_supported: false,
             grant_types_supported: None,
         };
         let pkce = PkceChallenge {
@@ -1909,7 +1865,7 @@ mod tests {
     fn test_dcr_registration_body_without_server_metadata() {
         // When server metadata is unavailable, include all supported grant types.
         let body = dcr_registration_body("http://127.0.0.1:12345/callback", None, &[]);
-        assert_eq!(body["client_name"], "Zed");
+        assert_eq!(body["client_name"], "Kurocto");
         assert_eq!(body["redirect_uris"][0], "http://127.0.0.1:12345/callback");
         assert_eq!(body["grant_types"][0], "authorization_code");
         assert_eq!(body["grant_types"][1], "refresh_token");
@@ -2199,7 +2155,6 @@ mod tests {
                 "https://auth.example.com/token"
             );
             assert!(metadata.registration_endpoint.is_some());
-            assert!(metadata.client_id_metadata_document_supported);
             assert_eq!(
                 metadata.code_challenge_methods_supported,
                 Some(vec!["S256".to_string()])
@@ -2236,7 +2191,6 @@ mod tests {
                 metadata.authorization_endpoint.as_str(),
                 "https://auth.example.com/authorize"
             );
-            assert!(!metadata.client_id_metadata_document_supported);
         });
     }
 
@@ -2279,35 +2233,47 @@ mod tests {
     // -- Full discover integration tests -------------------------------------
 
     #[test]
-    fn test_full_discover_with_cimd() {
+    fn test_full_discover_registers_dynamically_when_cimd_is_supported() {
         gpui::block_on(async {
-            let client = make_fake_http_client(|req| {
-                Box::pin(async move {
-                    let uri = req.uri().to_string();
-                    if uri.contains("oauth-protected-resource") {
-                        json_response(
-                            200,
-                            r#"{
-                                "resource": "https://mcp.example.com",
-                                "authorization_servers": ["https://auth.example.com"],
-                                "scopes_supported": ["mcp:read"]
-                            }"#,
-                        )
-                    } else if uri.contains("oauth-authorization-server") {
-                        json_response(
-                            200,
-                            r#"{
-                                "issuer": "https://auth.example.com",
-                                "authorization_endpoint": "https://auth.example.com/authorize",
-                                "token_endpoint": "https://auth.example.com/token",
-                                "code_challenge_methods_supported": ["S256"],
-                                "client_id_metadata_document_supported": true
-                            }"#,
-                        )
-                    } else {
-                        json_response(404, "{}")
-                    }
-                })
+            let requests = Arc::new(parking_lot::Mutex::new(Vec::new()));
+            let client = make_fake_http_client({
+                let requests = requests.clone();
+                move |req| {
+                    let requests = requests.clone();
+                    Box::pin(async move {
+                        let uri = req.uri().to_string();
+                        let mut body = String::new();
+                        futures::AsyncReadExt::read_to_string(&mut req.into_body(), &mut body)
+                            .await?;
+                        requests.lock().push((uri.clone(), body));
+                        if uri.contains("oauth-protected-resource") {
+                            json_response(
+                                200,
+                                r#"{
+                                    "resource": "https://mcp.example.com",
+                                    "authorization_servers": ["https://auth.example.com"],
+                                    "scopes_supported": ["mcp:read"]
+                                }"#,
+                            )
+                        } else if uri.contains("oauth-authorization-server") {
+                            json_response(
+                                200,
+                                r#"{
+                                    "issuer": "https://auth.example.com",
+                                    "authorization_endpoint": "https://auth.example.com/authorize",
+                                    "token_endpoint": "https://auth.example.com/token",
+                                    "registration_endpoint": "https://auth.example.com/register",
+                                    "code_challenge_methods_supported": ["S256"],
+                                    "client_id_metadata_document_supported": true
+                                }"#,
+                            )
+                        } else if uri.contains("/register") {
+                            json_response(201, r#"{"client_id": "dcr-minted-id-123"}"#)
+                        } else {
+                            json_response(404, "{}")
+                        }
+                    })
+                }
             });
 
             let server_url = Url::parse("https://mcp.example.com").unwrap();
@@ -2319,14 +2285,47 @@ mod tests {
             };
 
             let discovery = discover(&client, &server_url, &www_auth).await.unwrap();
+            assert_eq!(
+                determine_registration_strategy(&discovery.auth_server_metadata),
+                ClientRegistrationStrategy::Dcr {
+                    registration_endpoint: Url::parse("https://auth.example.com/register").unwrap(),
+                }
+            );
             let registration =
                 resolve_client_registration(&client, &discovery, "http://127.0.0.1:12345/callback")
                     .await
                     .unwrap();
 
-            assert_eq!(registration.client_id, CIMD_URL);
+            assert_eq!(registration.client_id, "dcr-minted-id-123");
             assert_eq!(registration.client_secret, None);
             assert_eq!(discovery.scopes, vec!["mcp:read"]);
+
+            let authorization_url = build_authorization_url(
+                &discovery.auth_server_metadata,
+                &registration.client_id,
+                "http://127.0.0.1:12345/callback",
+                &discovery.scopes,
+                "https://mcp.example.com",
+                &PkceChallenge {
+                    verifier: "test_verifier".into(),
+                    challenge: "test_challenge".into(),
+                },
+                "random_state_123",
+            );
+            assert!(!authorization_url.as_str().contains("zed.dev"));
+
+            let requests = requests.lock();
+            let (_, registration_body) = requests
+                .iter()
+                .find(|(uri, _)| uri == "https://auth.example.com/register")
+                .expect("no dynamic client registration request was made");
+            let registration_body: serde_json::Value =
+                serde_json::from_str(registration_body).unwrap();
+            assert_eq!(registration_body["client_name"], "Kurocto");
+            for (uri, body) in requests.iter() {
+                assert!(!uri.contains("zed.dev"), "request to {uri}");
+                assert!(!body.contains("zed.dev"), "request body {body}");
+            }
         });
     }
 
@@ -2472,7 +2471,6 @@ mod tests {
                 registration_endpoint: None,
                 scopes_supported: None,
                 code_challenge_methods_supported: Some(vec!["S256".into()]),
-                client_id_metadata_document_supported: true,
                 grant_types_supported: None,
             };
 
@@ -2480,7 +2478,7 @@ mod tests {
                 &client,
                 &metadata,
                 "auth_code_123",
-                CIMD_URL,
+                "client_abc",
                 "http://127.0.0.1:9999/callback",
                 "verifier_abc",
                 "https://mcp.example.com",
@@ -2522,7 +2520,7 @@ mod tests {
                 &client,
                 &token_endpoint,
                 "old_refresh_token",
-                CIMD_URL,
+                "client_abc",
                 "https://mcp.example.com",
                 None,
             )
@@ -2549,7 +2547,6 @@ mod tests {
                 registration_endpoint: None,
                 scopes_supported: None,
                 code_challenge_methods_supported: Some(vec!["S256".into()]),
-                client_id_metadata_document_supported: true,
                 grant_types_supported: None,
             };
 

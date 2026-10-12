@@ -6,6 +6,7 @@ use extension_host::{ExtensionOperation, ExtensionStatus, ExtensionStore};
 use gpui::{Anchor, ElementId, Entity, Point, SharedString, prelude::*};
 use release_channel::ReleaseChannel;
 use ui::{Chip, ContextMenu, PopoverMenu, Tooltip, prelude::*, utils::format_number_with_commas};
+use workspace::notifications::DetachAndPromptErr as _;
 
 type ContextMenuBuilder = Box<
     dyn Fn(Arc<str>, SharedString, &mut Window, &mut App) -> Option<Entity<ContextMenu>> + 'static,
@@ -296,11 +297,15 @@ impl ExtensionCard {
         )
         .on_click({
             let extension_id = extension_id.clone();
-            move |_, _, cx| {
+            move |_, window, cx| {
                 telemetry::event!("Extension Installed");
-                ExtensionStore::global(cx).update(cx, |store, cx| {
-                    store.install_latest_extension(extension_id.clone(), cx)
-                });
+                ExtensionStore::global(cx)
+                    .update(cx, |store, cx| {
+                        store.install_latest_extension(extension_id.clone(), cx)
+                    })
+                    .detach_and_prompt_err("Failed to install extension", window, cx, |_, _, _| {
+                        None
+                    });
             }
         })
     }

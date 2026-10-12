@@ -281,9 +281,9 @@ Open the Settings Editor and search for “Threads Sidebar Auto Open”. Or add 
 
 ## Auto Install extensions
 
-- Description: Define extensions to install automatically or never install.
+- Description: Define extensions to install automatically from the [extension registry](#extension-registry-url) or never install. Nothing is installed unless `extension_registry_url` is set.
 - Setting: `auto_install_extensions`
-- Default: `{ "html": true }`
+- Default: `{}`
 
 **Options**
 
@@ -2040,6 +2040,24 @@ Positive `integer` values
 **Options**
 
 Positive `integer` value between 1 and 32. Values outside of this range will be clamped to this range.
+
+## Extension Registry URL
+
+- Description: The base URL of the extension registry used to browse, install and update extensions. When unset, no extension registry is contacted and extensions can only be installed from a local directory. Using a registry operated by someone else is subject to that operator's terms.
+- Setting: `extension_registry_url`
+- Default: `null`
+
+**Options**
+
+`string` values, for example:
+
+```json [settings]
+{
+  "extension_registry_url": "https://registry.example.com"
+}
+```
+
+See [Installing Extensions](../extensions/installing-extensions.md#extension-registry).
 
 ## Extend Comment On Newline
 

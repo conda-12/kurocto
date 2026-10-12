@@ -13,6 +13,7 @@ use settings::update_settings_file;
 use ui::{HighlightedLabel, ListItem, ListItemSpacing, prelude::*};
 use util::ResultExt;
 use workspace::ModalView;
+use workspace::notifications::DetachAndPromptErr as _;
 
 pub struct ExtensionVersionSelector {
     picker: Entity<Picker<ExtensionVersionSelectorDelegate>>,
@@ -183,7 +184,7 @@ impl PickerDelegate for ExtensionVersionSelectorDelegate {
         }
 
         let extension_store = ExtensionStore::global(cx);
-        extension_store.update(cx, |store, cx| {
+        let install = extension_store.update(cx, |store, cx| {
             let extension_id = extension_version.id.clone();
             let version = extension_version.manifest.version.clone();
 
@@ -197,8 +198,9 @@ impl PickerDelegate for ExtensionVersionSelectorDelegate {
                 }
             });
 
-            store.install_extension(extension_id, version, cx);
+            store.install_extension(extension_id, version, cx)
         });
+        install.detach_and_prompt_err("Failed to install extension", window, cx, |_, _, _| None);
     }
 
     fn dismissed(&mut self, _: &mut Window, cx: &mut Context<Picker<Self>>) {

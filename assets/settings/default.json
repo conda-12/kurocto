@@ -2302,13 +2302,19 @@
     "path": null,
     "npm_path": null,
   },
-  // The extensions that Zed should automatically install on startup.
+  // The base URL of the extension registry used to browse, install and update
+  // extensions. No registry is configured by default: nothing is contacted, and
+  // extensions can only be installed from a local directory. Using a registry
+  // operated by someone else is subject to that operator's terms.
   //
-  // If you don't want any of these extensions, add this field to your settings
-  // and change the value to `false`.
-  "auto_install_extensions": {
-    "html": true,
-  },
+  // "extension_registry_url": "https://registry.example.com",
+  "extension_registry_url": null,
+  // The extensions to install automatically on startup from the extension
+  // registry. Nothing is installed unless `extension_registry_url` is set.
+  //
+  // To stop one of these extensions from being installed, add this field to
+  // your settings and change its value to `false`.
+  "auto_install_extensions": {},
   // Whether to suggest installing extensions based on the files you open.
   "suggest_extensions": true,
   // The capabilities granted to extensions.

@@ -7,12 +7,14 @@ use std::sync::Arc;
 
 #[derive(Debug, Default, Clone, RegisterSetting)]
 pub struct ExtensionSettings {
-    /// The extensions that should be automatically installed by Zed.
+    /// The base URL of the extension registry, without a trailing slash.
     ///
-    /// This is used to make functionality provided by extensions (e.g., language support)
-    /// available out-of-the-box.
+    /// `None` means that no extension registry is configured, in which case the
+    /// extension store must not make any network requests.
+    pub registry_url: Option<String>,
+    /// The extensions that should be automatically installed from the extension registry.
     ///
-    /// Default: { "html": true }
+    /// Default: {}
     pub auto_install_extensions: HashMap<Arc<str>, bool>,
     pub auto_update_extensions: HashMap<Arc<str>, bool>,
     pub suggest_extensions: bool,
@@ -39,6 +41,13 @@ impl ExtensionSettings {
 impl Settings for ExtensionSettings {
     fn from_settings(content: &settings::SettingsContent) -> Self {
         Self {
+            registry_url: content
+                .extension
+                .extension_registry_url
+                .as_deref()
+                .map(|registry_url| registry_url.trim().trim_end_matches('/'))
+                .filter(|registry_url| !registry_url.is_empty())
+                .map(str::to_string),
             auto_install_extensions: content.extension.auto_install_extensions.clone(),
             auto_update_extensions: content.extension.auto_update_extensions.clone(),
             suggest_extensions: content.extension.suggest_extensions,

@@ -11,7 +11,7 @@ use cloud_api_types::{ExtensionMetadata, ExtensionProvides};
 use collections::{BTreeMap, BTreeSet};
 use command_palette_hooks::CommandPaletteFilter;
 use editor::{Editor, EditorElement, EditorStyle};
-use extension_host::{ExtensionIndexEntry, ExtensionManifest, ExtensionStore};
+use extension_host::{ExtensionIndexEntry, ExtensionManifest, ExtensionSettings, ExtensionStore};
 use fuzzy::{StringMatch, StringMatchCandidate, match_strings};
 use git::{GitHostingProviderRegistry, parse_git_remote_url};
 use gpui::{
@@ -25,7 +25,7 @@ use project::DirectoryLister;
 
 use schemars::JsonSchema;
 use serde::Deserialize;
-use settings::{Settings, SettingsContent};
+use settings::{Settings, SettingsContent, SettingsStore};
 use strum::IntoEnumIterator as _;
 use theme_settings::ThemeSettings;
 use ui::{
@@ -66,6 +66,8 @@ pub struct RebuildDevExtension {
     #[serde(default)]
     pub extension_id: Option<String>,
 }
+
+const NO_REGISTRY_MESSAGE: &str = "No extension registry is configured. Extensions can be installed from a local directory with \"Install Dev Extension\".";
 
 #[derive(Default)]
 struct DevExtensionNotInstalledError {
@@ -379,6 +381,8 @@ enum ExtensionFetchState {
     Fetching,
     Succeeded,
     Failed,
+    /// No extension registry is configured, so nothing is fetched.
+    NoRegistry,
 }
 
 #[derive(Clone, Copy, PartialEq, Eq)]
@@ -403,7 +407,7 @@ pub struct ExtensionsPage {
     query_editor: Entity<Editor>,
     query_contains_error: bool,
     provides_filter: Option<ExtensionProvides>,
-    _subscriptions: [gpui::Subscription; 2],
+    _subscriptions: [gpui::Subscription; 3],
     extension_fetch_task: Option<Task<()>>,
     local_search_task: Option<Task<()>>,
     upsells: BTreeSet<Feature>,
@@ -439,6 +443,15 @@ impl ExtensionsPage {
                         _ => {}
                     },
                 ),
+                cx.observe_global::<SettingsStore>(|this: &mut Self, cx| {
+                    let registry_is_configured =
+                        ExtensionSettings::get_global(cx).registry_url.is_some();
+                    let registry_was_configured =
+                        this.fetch_state != ExtensionFetchState::NoRegistry;
+                    if registry_is_configured != registry_was_configured {
+                        this.fetch_extensions(FetchDebounce::Immediate, None, cx);
+                    }
+                }),
             ];
 
             let query_editor = cx.new(|cx| {
@@ -627,7 +640,12 @@ impl ExtensionsPage {
         let remote_row = |(index, _)| DisplayedExtension::Remote(index);
 
         self.displayed_extensions = match self.filter {
-            ExtensionFilter::All if self.fetch_state == ExtensionFetchState::Failed => {
+            ExtensionFilter::All
+                if matches!(
+                    self.fetch_state,
+                    ExtensionFetchState::Failed | ExtensionFetchState::NoRegistry
+                ) =>
+            {
                 installed_rows.map(installed_row).collect()
             }
             ExtensionFilter::All => installed_rows
@@ -657,6 +675,14 @@ impl ExtensionsPage {
         on_complete: Option<Box<dyn FnOnce(&mut Self, &mut Context<Self>)>>,
         cx: &mut Context<Self>,
     ) {
+        if ExtensionSettings::get_global(cx).registry_url.is_none() {
+            self.extension_fetch_task = None;
+            self.fetch_state = ExtensionFetchState::NoRegistry;
+            self.remote_extensions.clear();
+            self.rebuild_displayed_extensions(cx);
+            return;
+        }
+
         let search = self.search_query(cx);
         let provides_filter = BTreeSet::from_iter(self.provides_filter);
         self.fetch_state = ExtensionFetchState::Fetching;
@@ -1598,6 +1624,16 @@ impl Render for ExtensionsPage {
                     ),
             )
             .child(self.render_feature_upsells(cx))
+            .when(
+                self.fetch_state == ExtensionFetchState::NoRegistry,
+                |this| {
+                    this.child(
+                        div().pt_4().px_4().child(
+                            Banner::new().child(Label::new(NO_REGISTRY_MESSAGE).mt_0p5()),
+                        ),
+                    )
+                },
+            )
             .child(v_flex().px_4().size_full().overflow_y_hidden().map(|this| {
                 let count = self.displayed_extensions.len();
 
@@ -1662,5 +1698,81 @@ impl Item for ExtensionsPage {
 
     fn to_item_events(event: &Self::Event, f: &mut dyn FnMut(workspace::item::ItemEvent)) {
         f(*event)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use extension::ExtensionHostProxy;
+    use gpui::TestAppContext;
+    use http_client::HttpClient as _;
+    use project::Project;
+    use std::sync::Mutex;
+    use workspace::AppState;
+
+    #[gpui::test]
+    async fn test_page_only_fetches_with_registry(cx: &mut TestAppContext) {
+        let app_state = cx.update(|cx| {
+            let app_state = AppState::test(cx);
+            AppState::set_global(app_state.clone(), cx);
+            cx.set_global(db::AppDatabase::test_new());
+            release_channel::init(semver::Version::new(0, 0, 0), cx);
+            extension::init(cx);
+            extension_host::init(
+                Arc::new(ExtensionHostProxy::new()),
+                app_state.fs.clone(),
+                app_state.client.clone(),
+                app_state.node_runtime.clone(),
+                cx,
+            );
+            editor::init(cx);
+            crate::init(cx);
+            app_state
+        });
+        let requested_urls = Arc::new(Mutex::new(Vec::new()));
+        app_state.client.http_client().as_fake().replace_handler({
+            let requested_urls = requested_urls.clone();
+            move |handler, request| {
+                requested_urls
+                    .lock()
+                    .unwrap()
+                    .push(request.uri().to_string());
+                handler(request)
+            }
+        });
+        let project = Project::test(app_state.fs.as_fake(), [], cx).await;
+        let (workspace, cx) = cx.add_window_view(|window, cx| {
+            Workspace::new(None, project, app_state.clone(), window, cx)
+        });
+
+        let page = workspace.update_in(cx, |workspace, window, cx| {
+            ExtensionsPage::new(workspace, None, Some("html"), window, cx)
+        });
+        cx.run_until_parked();
+
+        page.read_with(cx, |page, _| {
+            assert!(page.fetch_state == ExtensionFetchState::NoRegistry);
+            assert!(page.remote_extensions.is_empty());
+        });
+        assert_eq!(*requested_urls.lock().unwrap(), Vec::<String>::new());
+
+        cx.update(|_, cx| {
+            cx.update_global::<SettingsStore, _>(|store, cx| {
+                store.update_user_settings(cx, |content| {
+                    content.extension.extension_registry_url =
+                        Some("https://registry.example.test".to_string());
+                });
+            });
+        });
+        cx.run_until_parked();
+
+        page.read_with(cx, |page, _| {
+            assert!(page.fetch_state != ExtensionFetchState::NoRegistry);
+        });
+        assert_eq!(
+            *requested_urls.lock().unwrap(),
+            vec!["https://registry.example.test/extensions/html?".to_string()]
+        );
     }
 }

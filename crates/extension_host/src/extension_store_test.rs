@@ -1,8 +1,8 @@
 use crate::{
     Event, ExtensionIndex, ExtensionIndexEntry, ExtensionIndexLanguageEntry,
-    ExtensionIndexThemeEntry, ExtensionManifest, ExtensionStore, GrammarManifestEntry,
-    MAX_REMOTE_SYNC_ATTEMPTS, MAX_REMOTE_SYNC_RETRY_DELAY, RELOAD_DEBOUNCE_DURATION,
-    REMOTE_SYNC_TIMEOUT, SchemaVersion,
+    ExtensionIndexThemeEntry, ExtensionManifest, ExtensionSettings, ExtensionStore,
+    GrammarManifestEntry, MAX_REMOTE_SYNC_ATTEMPTS, MAX_REMOTE_SYNC_RETRY_DELAY,
+    NO_EXTENSION_REGISTRY_MESSAGE, RELOAD_DEBOUNCE_DURATION, REMOTE_SYNC_TIMEOUT, SchemaVersion,
     headless_host::{
         ExtensionVersion, HeadlessExtensionStore, LoadedExtension, STALE_UPLOAD_TTL,
         hash_directory_contents, remove_stale_uploads,
@@ -12,7 +12,8 @@ use crate::{
 use async_compression::futures::bufread::GzipEncoder;
 use async_trait::async_trait;
 use client::{AnyProtoClient, TypedEnvelope, proto};
-use collections::{BTreeMap, HashMap, HashSet};
+use cloud_api_types::ExtensionProvides;
+use collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 use extension::{
     BuildTaskTemplate, CodeLabel, Command, Completion, ContextServerConfiguration,
     DebugAdapterBinary, DebugRequest, DebugScenario, DebugTaskDefinition, Extension,
@@ -22,8 +23,11 @@ use extension::{
 };
 use fs::{FakeFs, Fs, RealFs, RemoveOptions};
 use futures::{AsyncReadExt, FutureExt, StreamExt, io::BufReader};
-use gpui::{AppContext as _, BackgroundExecutor, Entity, EntityId, TaskExt, TestAppContext};
-use http_client::{FakeHttpClient, Response};
+use gpui::{
+    AppContext as _, BackgroundExecutor, BorrowAppContext as _, Entity, EntityId, TaskExt,
+    TestAppContext,
+};
+use http_client::{AsyncBody, FakeHttpClient, HttpClientWithUrl, Response};
 use language::{
     BinaryStatus, LanguageConfig, LanguageMatcher, LanguageName, LanguageRegistry, QueryFiles,
 };
@@ -36,7 +40,7 @@ use release_channel::AppVersion;
 use remote::{ConnectionState, RemoteClient, RemoteClientEvent, RemoteConnectionOptions};
 use reqwest_client::ReqwestClient;
 use serde_json::json;
-use settings::SettingsStore;
+use settings::{Settings as _, SettingsStore};
 use std::{
     ffi::OsString,
     path::{Path, PathBuf},
@@ -48,6 +52,7 @@ use std::{
 };
 use task::{SpawnInTerminal, ZedDebugConfig};
 use theme::ThemeRegistry;
+use url::Url;
 use util::{rel_path::rel_path_buf, test::TempTree};
 
 #[cfg(test)]
@@ -4009,6 +4014,272 @@ fn insert_remote_sync_index_entry(store: &Entity<ExtensionStore>, cx: &mut TestA
             ),
         );
     });
+}
+
+#[gpui::test]
+async fn test_default_settings_configure_no_registry(cx: &mut TestAppContext) {
+    init_test(cx);
+
+    cx.update(|cx| {
+        let settings = ExtensionSettings::get_global(cx);
+        assert_eq!(settings.registry_url, None);
+        assert!(settings.auto_install_extensions.is_empty());
+    });
+}
+
+#[gpui::test]
+async fn test_no_requests_without_registry(cx: &mut TestAppContext) {
+    init_test(cx);
+
+    let fs = FakeFs::new(cx.executor());
+    insert_remote_relevant_extension(&fs, "foo").await;
+    let requested_urls = Arc::new(Mutex::new(Vec::new()));
+    let store = create_extension_store_with_registry_client(fs, requested_urls.clone(), cx);
+
+    assert_eq!(*requested_urls.lock(), Vec::<Url>::new());
+    assert_only_foo_is_installed(&store, cx);
+
+    assert_no_registry_error(
+        store
+            .update(cx, |store, cx| store.fetch_extensions(None, None, cx))
+            .await,
+    );
+    assert_no_registry_error(
+        store
+            .update(cx, |store, cx| store.fetch_extension_versions("foo", cx))
+            .await,
+    );
+    assert_no_registry_error(
+        store
+            .update(cx, |store, cx| {
+                store.fetch_extensions_with_update_available(cx)
+            })
+            .await,
+    );
+    assert_no_registry_error(
+        store
+            .update(cx, |store, cx| {
+                store.install_latest_extension("bar".into(), cx)
+            })
+            .await,
+    );
+    assert_no_registry_error(
+        store
+            .update(cx, |store, cx| {
+                store.install_extension("bar".into(), "1.2.3".into(), cx)
+            })
+            .await,
+    );
+    assert_no_registry_error(
+        store
+            .update(cx, |store, cx| {
+                store.upgrade_extension("foo".into(), "1.2.3".into(), cx)
+            })
+            .await,
+    );
+    cx.run_until_parked();
+
+    assert_eq!(*requested_urls.lock(), Vec::<Url>::new());
+    assert_only_foo_is_installed(&store, cx);
+}
+
+#[gpui::test]
+async fn test_no_auto_install_without_registry(cx: &mut TestAppContext) {
+    init_test(cx);
+    cx.update(|cx| {
+        cx.update_global::<SettingsStore, _>(|store, cx| {
+            store.update_user_settings(cx, |content| {
+                content
+                    .extension
+                    .auto_install_extensions
+                    .insert("html".into(), true);
+            });
+        });
+    });
+
+    let fs = FakeFs::new(cx.executor());
+    insert_remote_relevant_extension(&fs, "foo").await;
+    let requested_urls = Arc::new(Mutex::new(Vec::new()));
+    let store = create_extension_store_with_registry_client(fs, requested_urls.clone(), cx);
+
+    assert_eq!(*requested_urls.lock(), Vec::<Url>::new());
+    assert_only_foo_is_installed(&store, cx);
+}
+
+#[gpui::test]
+async fn test_registry_requests_use_configured_url(cx: &mut TestAppContext) {
+    init_test(cx);
+    cx.update(|cx| {
+        cx.update_global::<SettingsStore, _>(|store, cx| {
+            store.update_user_settings(cx, |content| {
+                content.extension.extension_registry_url =
+                    Some("https://registry.example.test/api/".into());
+                content
+                    .extension
+                    .auto_install_extensions
+                    .insert("html".into(), true);
+            });
+        });
+    });
+
+    let fs = FakeFs::new(cx.executor());
+    insert_remote_relevant_extension(&fs, "foo").await;
+    let requested_urls = Arc::new(Mutex::new(Vec::new()));
+    let store = create_extension_store_with_registry_client(fs, requested_urls.clone(), cx);
+
+    let version_range_keys = [
+        "min_schema_version",
+        "max_schema_version",
+        "min_wasm_api_version",
+        "max_wasm_api_version",
+    ];
+    let mut startup_requests = std::mem::take(&mut *requested_urls.lock());
+    startup_requests.sort_by(|a, b| a.path().cmp(b.path()));
+    assert_eq!(
+        startup_requests
+            .iter()
+            .map(|url| (url.origin().ascii_serialization(), url.path().to_string()))
+            .collect::<Vec<_>>(),
+        vec![
+            (
+                "https://registry.example.test".to_string(),
+                "/api/extensions/html/download".to_string()
+            ),
+            (
+                "https://registry.example.test".to_string(),
+                "/api/extensions/updates".to_string()
+            ),
+        ]
+    );
+    assert_eq!(query_keys(&startup_requests[0]), version_range_keys);
+    assert_eq!(
+        query_keys(&startup_requests[1]),
+        [version_range_keys.as_slice(), &["ids"]].concat()
+    );
+    assert_eq!(
+        startup_requests[1]
+            .query_pairs()
+            .find(|(key, _)| key == "ids")
+            .map(|(_, value)| value.into_owned()),
+        Some("foo".to_string())
+    );
+    assert_only_foo_is_installed(&store, cx);
+
+    let provides_filter = BTreeSet::from_iter([ExtensionProvides::Themes]);
+    let extensions = store
+        .update(cx, |store, cx| {
+            store.fetch_extensions(Some("rust"), Some(&provides_filter), cx)
+        })
+        .await
+        .unwrap();
+    assert!(extensions.is_empty());
+    assert_eq!(
+        std::mem::take(&mut *requested_urls.lock())
+            .iter()
+            .map(Url::as_str)
+            .collect::<Vec<_>>(),
+        vec![format!(
+            "https://registry.example.test/api/extensions?max_schema_version={}&filter=rust&provides=themes",
+            SchemaVersion::CURRENT
+        )]
+    );
+
+    store
+        .update(cx, |store, cx| store.fetch_extension_versions("foo", cx))
+        .await
+        .unwrap();
+    let install_error = store
+        .update(cx, |store, cx| {
+            store.install_extension("bar".into(), "1.2.3".into(), cx)
+        })
+        .await
+        .unwrap_err();
+    assert_ne!(install_error.to_string(), NO_EXTENSION_REGISTRY_MESSAGE);
+    assert_eq!(
+        std::mem::take(&mut *requested_urls.lock())
+            .iter()
+            .map(|url| (
+                url.origin().ascii_serialization(),
+                url.path().to_string(),
+                url.query().unwrap_or_default().to_string()
+            ))
+            .collect::<Vec<_>>(),
+        vec![
+            (
+                "https://registry.example.test".to_string(),
+                "/api/extensions/foo".to_string(),
+                String::new()
+            ),
+            (
+                "https://registry.example.test".to_string(),
+                "/api/extensions/bar/1.2.3/download".to_string(),
+                String::new()
+            ),
+        ]
+    );
+}
+
+fn query_keys(url: &Url) -> Vec<String> {
+    url.query_pairs().map(|(key, _)| key.into_owned()).collect()
+}
+
+fn assert_no_registry_error<T: std::fmt::Debug>(result: anyhow::Result<T>) {
+    assert_eq!(
+        result.unwrap_err().to_string(),
+        NO_EXTENSION_REGISTRY_MESSAGE
+    );
+}
+
+fn assert_only_foo_is_installed(store: &Entity<ExtensionStore>, cx: &mut TestAppContext) {
+    store.read_with(cx, |store, _| {
+        assert_eq!(
+            store.installed_extensions().keys().collect::<Vec<_>>(),
+            vec![&Arc::<str>::from("foo")]
+        );
+        assert!(store.outstanding_operations().is_empty());
+    });
+}
+
+/// Creates a store whose HTTP client records every requested URL, answers
+/// registry listings with an empty result and fails every download.
+fn create_extension_store_with_registry_client(
+    fs: Arc<FakeFs>,
+    requested_urls: Arc<Mutex<Vec<Url>>>,
+    cx: &mut TestAppContext,
+) -> Entity<ExtensionStore> {
+    let http_client: Arc<HttpClientWithUrl> = FakeHttpClient::create(move |request| {
+        let requested_urls = requested_urls.clone();
+        async move {
+            let url = Url::parse(&request.uri().to_string())?;
+            let is_download = url.path().ends_with("/download");
+            requested_urls.lock().push(url);
+            if is_download {
+                anyhow::bail!("downloads are not available in this test");
+            }
+            Ok(Response::builder()
+                .status(200)
+                .body(AsyncBody::from(r#"{"data":[]}"#.to_string()))?)
+        }
+    });
+
+    let store = cx.new(|cx| {
+        ExtensionStore::new(
+            PathBuf::from("/extensions"),
+            None,
+            Arc::new(ExtensionHostProxy::new()),
+            fs,
+            http_client.clone(),
+            http_client,
+            None,
+            NodeRuntime::unavailable(),
+            cx,
+        )
+    });
+    cx.run_until_parked();
+    cx.executor().advance_clock(RELOAD_DEBOUNCE_DURATION);
+    cx.run_until_parked();
+
+    store
 }
 
 fn advance_through_sync_backoff(cx: &mut TestAppContext) {
