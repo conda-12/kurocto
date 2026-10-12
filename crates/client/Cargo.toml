@@ -33,7 +33,6 @@ rpc = { workspace = true, features = ["gpui"] }
 serde.workspace = true
 serde_json.workspace = true
 settings.workspace = true
-sha2.workspace = true
 telemetry.workspace = true
 telemetry_events.workspace = true
 text.workspace = true
@@ -50,6 +49,7 @@ gpui = { workspace = true, features = ["test-support"] }
 http_client = { workspace = true, features = ["test-support"] }
 rpc = { workspace = true, features = ["test-support"] }
 settings = { workspace = true, features = ["test-support"] }
+tempfile.workspace = true
 util = { workspace = true, features = ["test-support"] }
 
 [target.'cfg(target_os = "windows")'.dependencies]

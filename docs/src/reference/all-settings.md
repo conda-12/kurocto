@@ -4618,36 +4618,25 @@ List of `integer` column numbers
 
 ## Telemetry
 
-- Description: Control what info is collected by Zed.
+- Description: Control what usage info is recorded.
 - Setting: `telemetry`
 - Default:
 
 ```json [settings]
 {
   "telemetry": {
-    "diagnostics": true,
-    "metrics": true
+    "metrics": false
   }
 }
 ```
 
 **Options**
 
-### Diagnostics
-
-- Description: Setting for sending debug-related data, such as crash reports.
-- Setting: `diagnostics`
-- Default: `true`
-
-**Options**
-
-`boolean` values
-
 ### Metrics
 
-- Description: Setting for sending anonymized usage data, such as what languages you're using Zed with.
+- Description: Record usage events, such as what languages you're using Zed with, to a local log file. The events are not sent anywhere.
 - Setting: `metrics`
-- Default: `true`
+- Default: `false`
 
 **Options**
 

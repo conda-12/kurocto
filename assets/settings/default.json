@@ -1677,12 +1677,11 @@
   //
   // Default: true
   "word_diff_enabled": true,
-  // Control what info is collected by Zed.
+  // Control what usage info is recorded.
   "telemetry": {
-    // Send debug info like crash reports.
-    "diagnostics": true,
-    // Send anonymized usage data like what languages you're using Zed with.
-    "metrics": true,
+    // Record usage events, like what languages you're using, to a local log
+    // file. The events are not sent anywhere.
+    "metrics": false,
     // Allow sending requests to Anthropic models that cannot be offered with
     // Zero Data Retention
     "anthropic_retention": false,

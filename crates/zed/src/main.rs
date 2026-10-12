@@ -22,7 +22,7 @@ use cli::FORCE_CLI_MODE_ENV_VAR_NAME;
 use client::{Client, ProxySettings, UserStore};
 use collections::HashMap;
 use crashes::InitCrashHandler;
-use db::kvp::{GlobalKeyValueStore, KeyValueStore};
+use db::kvp::KeyValueStore;
 use editor::Editor;
 use extension::ExtensionHostProxy;
 use fs::{Fs, RealFs};
@@ -341,10 +341,9 @@ fn main() {
         .with_restart_arguments(restart_arguments);
 
     let app_db = db::AppDatabase::new();
-    let system_id = app.background_executor().spawn(system_id());
-    let installation_id = app
+    let is_new_install = app
         .background_executor()
-        .spawn(installation_id(KeyValueStore::from_app_db(&app_db)));
+        .spawn(detect_new_install(KeyValueStore::from_app_db(&app_db)));
     let session_id = Uuid::new_v4().to_string();
     let session = app.background_executor().spawn(Session::new(
         session_id.clone(),
@@ -380,15 +379,12 @@ fn main() {
         return;
     }
 
-    let should_install_crash_handler =
-        client::telemetry::should_install_crash_handler(*release_channel::RELEASE_CHANNEL);
-
-    let crash_handler = if should_install_crash_handler {
+    let crash_handler = if crashes::should_install_crash_handler() {
         Some(
             app.background_executor().spawn(crashes::init(
                 InitCrashHandler {
                     session_id,
-                    // strip the build and channel information from the version string, we send them separately
+                    // strip the build and channel information from the version string, they are recorded separately
                     zed_version: semver::Version::new(
                         app_version.major,
                         app_version.minor,
@@ -589,34 +585,16 @@ fn main() {
         debugger_tools::init(cx);
         feature_flags::FeatureFlagStore::init(cx);
 
-        let system_id = cx.foreground_executor().block_on(system_id).ok();
-        let installation_id = cx.foreground_executor().block_on(installation_id).ok();
+        let is_new_install = cx.foreground_executor().block_on(is_new_install).log_err();
         let session = cx.foreground_executor().block_on(session);
 
         let telemetry = client.telemetry();
-        telemetry.start(
-            system_id.as_ref().map(|id| id.to_string()),
-            installation_id.as_ref().map(|id| id.to_string()),
-            session.id().to_owned(),
-            cx,
-        );
-        let is_new_install = matches!(&installation_id, Some(IdType::New(_)));
-
-        // We should rename these in the future to `first app open`, `first app open for release channel`, and `app open`
-        if let (Some(system_id), Some(installation_id)) = (&system_id, &installation_id) {
-            match (&system_id, &installation_id) {
-                (IdType::New(_), IdType::New(_)) => {
-                    telemetry::event!("App First Opened");
-                    telemetry::event!("App First Opened For Release Channel");
-                }
-                (IdType::Existing(_), IdType::New(_)) => {
-                    telemetry::event!("App First Opened For Release Channel");
-                }
-                (_, IdType::Existing(_)) => {
-                    telemetry::event!("App Opened");
-                }
-            }
+        match is_new_install {
+            Some(true) => telemetry::event!("App First Opened For Release Channel"),
+            Some(false) => telemetry::event!("App Opened"),
+            None => {}
         }
+        let is_new_install = is_new_install.unwrap_or(false);
         let app_session = cx.new(|cx| AppSession::new(session, cx));
 
         let app_state = Arc::new(AppState {
@@ -1273,41 +1251,25 @@ fn handle_open_request(request: OpenRequest, app_state: Arc<AppState>, cx: &mut 
     }
 }
 
-async fn system_id() -> Result<IdType> {
-    let key_name = "system_id".to_string();
-    let db = GlobalKeyValueStore::global();
-
-    if let Ok(Some(system_id)) = db.read_kvp(&key_name) {
-        return Ok(IdType::Existing(system_id));
-    }
-
-    let system_id = Uuid::new_v4().to_string();
-
-    db.write_kvp(key_name, system_id.clone()).await?;
-
-    Ok(IdType::New(system_id))
-}
-
-async fn installation_id(db: KeyValueStore) -> Result<IdType> {
+/// Reports whether this is the first launch against this release channel's
+/// database, leaving a marker behind so that later launches are not.
+async fn detect_new_install(db: KeyValueStore) -> Result<bool> {
     let legacy_key_name = "device_id".to_string();
     let key_name = "installation_id".to_string();
 
-    // Migrate legacy key to new key
-    if let Ok(Some(installation_id)) = db.read_kvp(&legacy_key_name) {
-        db.write_kvp(key_name, installation_id.clone()).await?;
+    if let Ok(Some(legacy_marker)) = db.read_kvp(&legacy_key_name) {
+        db.write_kvp(key_name, legacy_marker).await?;
         db.delete_kvp(legacy_key_name).await?;
-        return Ok(IdType::Existing(installation_id));
+        return Ok(false);
     }
 
-    if let Ok(Some(installation_id)) = db.read_kvp(&key_name) {
-        return Ok(IdType::Existing(installation_id));
+    if let Ok(Some(_)) = db.read_kvp(&key_name) {
+        return Ok(false);
     }
 
-    let installation_id = Uuid::new_v4().to_string();
+    db.write_kvp(key_name, Uuid::new_v4().to_string()).await?;
 
-    db.write_kvp(key_name, installation_id.clone()).await?;
-
-    Ok(IdType::New(installation_id))
+    Ok(true)
 }
 
 pub(crate) async fn restore_or_create_workspace(
@@ -1680,20 +1642,6 @@ struct Args {
     #[cfg(target_os = "windows")]
     #[arg(long, hide = true)]
     etw_socket: Option<PathBuf>,
-}
-
-#[derive(Clone, Debug)]
-enum IdType {
-    New(String),
-    Existing(String),
-}
-
-impl ToString for IdType {
-    fn to_string(&self) -> String {
-        match self {
-            IdType::New(id) | IdType::Existing(id) => id.clone(),
-        }
-    }
 }
 
 fn parse_url_arg(arg: &str) -> String {

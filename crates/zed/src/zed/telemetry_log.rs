@@ -18,7 +18,7 @@ use markdown::{
 };
 use project::Project;
 use settings::Settings;
-use telemetry_events::{Event, EventWrapper};
+use telemetry_events::Event;
 use theme_settings::ThemeSettings;
 use ui::{
     Icon, IconButton, IconName, IconSize, Label, TextSize, Tooltip, WithScrollbar, prelude::*,
@@ -122,9 +122,9 @@ impl TelemetryLogView {
             .ok();
 
             let mut live_events = subscription.live_events;
-            while let Some(event_wrapper) = live_events.next().await {
+            while let Some(event) = live_events.next().await {
                 let result = this.update(cx, |this, cx| {
-                    this.push_event(event_wrapper, cx);
+                    this.push_event(event, cx);
                 });
                 if result.is_err() {
                     break;
@@ -144,15 +144,15 @@ impl TelemetryLogView {
         }
     }
 
-    fn event_wrapper_to_entry(
-        event_wrapper: &EventWrapper,
+    fn event_to_entry(
+        event: &Event,
         language_registry: &Arc<LanguageRegistry>,
         cx: &mut App,
     ) -> TelemetryLogEntry {
         let (event_type, std_event_properties): (
             SharedString,
             std::collections::HashMap<String, serde_json::Value>,
-        ) = match &event_wrapper.event {
+        ) = match event {
             Event::Flexible(flexible) => (
                 flexible.event_type.clone().into(),
                 flexible.event_properties.clone(),
@@ -186,19 +186,15 @@ impl TelemetryLogView {
         }
     }
 
-    fn push_event(&mut self, event_wrapper: EventWrapper, cx: &mut Context<Self>) {
-        self.push_events(std::iter::once(event_wrapper), cx);
+    fn push_event(&mut self, event: Event, cx: &mut Context<Self>) {
+        self.push_events(std::iter::once(event), cx);
     }
 
-    fn push_events(
-        &mut self,
-        event_wrappers: impl Iterator<Item = EventWrapper>,
-        cx: &mut Context<Self>,
-    ) {
+    fn push_events(&mut self, events: impl Iterator<Item = Event>, cx: &mut Context<Self>) {
         let language_registry = self.project.read(cx).languages().clone();
 
-        for event_wrapper in event_wrappers {
-            let entry = Self::event_wrapper_to_entry(&event_wrapper, &language_registry, cx);
+        for event in events {
+            let entry = Self::event_to_entry(&event, &language_registry, cx);
             self.events.push_back(entry);
         }
 
@@ -498,7 +494,7 @@ impl Render for TelemetryLogView {
                     .justify_center()
                     .items_center()
                     .child(if self.events.is_empty() {
-                        "No telemetry events recorded yet"
+                        "No events recorded. Events are only recorded, to a local log file, when the telemetry.metrics setting is enabled. They are not sent anywhere."
                     } else {
                         "No events match the current filter"
                     })

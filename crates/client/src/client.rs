@@ -175,7 +175,6 @@ impl<T: 'static> Drop for PendingEntitySubscription<T> {
 
 #[derive(Copy, Clone, Deserialize, Debug, RegisterSetting)]
 pub struct TelemetrySettings {
-    pub diagnostics: bool,
     pub metrics: bool,
     pub anthropic_retention: bool,
 }
@@ -184,7 +183,6 @@ impl settings::Settings for TelemetrySettings {
     fn from_settings(content: &SettingsContent) -> Self {
         let telemetry = content.telemetry.as_ref().unwrap();
         Self {
-            diagnostics: telemetry.diagnostics.unwrap(),
             metrics: telemetry.metrics.unwrap(),
             anthropic_retention: telemetry.anthropic_retention.unwrap(),
         }
@@ -198,7 +196,7 @@ impl Client {
         cx: &mut App,
     ) -> Arc<Self> {
         Arc::new(Self {
-            telemetry: Telemetry::new(clock, http.clone(), cx),
+            telemetry: Telemetry::new(clock, cx),
             http,
             credentials_provider: zed_credentials_provider::global(cx),
             handler_set: Default::default(),

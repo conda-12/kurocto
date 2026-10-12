@@ -351,6 +351,14 @@ async fn test_remote_telemetry_event_forwarding(
 
     let ssh = RemoteClient::connect_mock(opts, cx).await;
     let project = build_project(ssh, cx);
+    // Events are only recorded when the local telemetry log is enabled.
+    cx.update(|cx| {
+        SettingsStore::update_global(cx, |store, cx| {
+            store.update_user_settings(cx, |content| {
+                content.telemetry.get_or_insert_default().metrics = Some(true);
+            });
+        });
+    });
     project
         .update(cx, {
             let headless = headless.clone();

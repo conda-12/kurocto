@@ -112,7 +112,7 @@ How to get a symbolicated CPU profile from a released (non-dev) Zed instance.
 Use this when Zed is using a lot of CPU.
 
 Released macOS binaries are stripped of local symbols, so `sample` and Instruments show raw addresses for most frames.
-The debug symbols for every release are archived: `script/bundle-mac` uploads `zed.dwarf` to Sentry before stripping.
+`script/bundle-mac` extracts the debug symbols into a local `zed.dwarf` file before stripping; they are not uploaded anywhere.
 
 ### During the incident
 
@@ -126,7 +126,7 @@ The `zed-sample.txt` file can be sent to Zed together with the exact version.
 This can be done by Zed staff.
 
 - Find the binary UUID in the `Binary Images` section at the bottom of the sample output.
-- Download the matching `zed.dwarf` from the Sentry project's Debug Files page by searching for that UUID.
+- Find the `zed.dwarf` file that was kept for the build with that UUID.
 - Resolve the addresses:
   `atos -o zed.dwarf -l <load address> <address...>`
   Each unresolved frame in the sample output prints its `load address` and absolute address.

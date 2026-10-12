@@ -81,7 +81,7 @@ Zed moves quickly, and distribution maintainers often have different constraints
 - There are a couple of other `zed` binaries that may be present on Linux systems ([1](https://openzfs.github.io/openzfs-docs/man/v2.2/8/zed.8.html), [2](https://zed.brimdata.io/docs/commands/zed)). If you want to rename our CLI binary because of these issues, we suggest `zedit`, `zeditor`, or `zed-cli`.
 - Zed automatically installs versions of common developer tools, similar to rustup/rbenv/pyenv. This behavior is discussed [here](https://github.com/zed-industries/zed/issues/12589).
 - Users can install extensions locally and from [zed-industries/extensions](https://github.com/zed-industries/extensions). Extensions may install additional tools such as language servers. Planned safety improvements are tracked [here](https://github.com/zed-industries/zed/issues/12358).
-- Zed connects to several online services by default (AI, telemetry). AI and our telemetry can be disabled by your users with their zed settings or by patching our [default settings file](https://github.com/zed-industries/zed/blob/main/assets/settings/default.json).
+- Zed connects to online AI services when AI features are used. AI can be disabled by your users with their zed settings or by patching our [default settings file](https://github.com/zed-industries/zed/blob/main/assets/settings/default.json). Zed does not send telemetry or crash reports.
 - Because of the points above, Zed currently does not work well with sandboxes. See [this discussion](https://github.com/zed-industries/zed/pull/12006#issuecomment-2130421220).
 
 ## Flatpak
@@ -143,9 +143,9 @@ The `perf.data` file can be sent to Zed together with the exact commit.
 
 This can be done by Zed staff.
 
-Released Linux binaries are stripped, but the unstripped binary for every release is archived in Sentry (uploaded by `script/bundle-linux`).
-Download it from the Sentry project's Debug Files page (search by the release version or the binary's build id), then continue with the `perf buildid-cache` step below.
-Stripping preserves the build id, so the downloaded binary matches the user's `perf.data`.
+Released Linux binaries are stripped. `script/bundle-linux` splits the debug symbols into a local `zed.dbg` file next to the built binary before stripping; they are not uploaded anywhere.
+If you kept the unstripped binary or the `zed.dbg` file for that build, continue with the `perf buildid-cache` step below.
+Stripping preserves the build id, so they match the user's `perf.data`.
 
 Alternatively, rebuild the binary with symbols:
 

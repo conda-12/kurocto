@@ -114,7 +114,6 @@ pub struct AssetQuery<'a> {
     asset: &'a str,
     os: &'a str,
     arch: &'a str,
-    system_id: Option<&'a str>,
 }
 
 #[derive(Clone, Debug)]
@@ -683,12 +682,6 @@ impl AutoUpdater {
     ) -> Result<ReleaseAsset> {
         let client = this.read_with(cx, |this, _| this.client.clone());
 
-        let system_id = if client.telemetry().metrics_enabled() {
-            client.telemetry().system_id()
-        } else {
-            None
-        };
-
         let version = if let Some(mut version) = version {
             version.pre = semver::Prerelease::EMPTY;
             version.build = semver::BuildMetadata::EMPTY;
@@ -699,15 +692,8 @@ impl AutoUpdater {
         let http_client = client.http_client();
 
         let path = format!("/releases/{}/{}/asset", release_channel.dev_name(), version,);
-        let url = http_client.build_zed_cloud_url_with_query(
-            &path,
-            AssetQuery {
-                os,
-                arch,
-                asset,
-                system_id: system_id.as_deref(),
-            },
-        )?;
+        let url =
+            http_client.build_zed_cloud_url_with_query(&path, AssetQuery { os, arch, asset })?;
 
         let mut response = http_client
             .get(url.as_str(), Default::default(), true)

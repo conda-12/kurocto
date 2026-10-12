@@ -411,33 +411,12 @@ fn general_page(cx: &App) -> SettingsPage {
         ]
     }
 
-    fn privacy_section() -> [SettingsPageItem; 4] {
+    fn privacy_section() -> [SettingsPageItem; 3] {
         [
             SettingsPageItem::SectionHeader("Privacy"),
             SettingsPageItem::SettingItem(SettingItem {
-                title: "Telemetry Diagnostics",
-                description: "Send debug information like crash reports.",
-                field: Box::new(SettingField {
-                    json_path: Some("telemetry.diagnostics"),
-                    pick: |settings_content| {
-                        settings_content
-                            .telemetry
-                            .as_ref()
-                            .and_then(|telemetry| telemetry.diagnostics.as_ref())
-                    },
-                    write: |settings_content, value, _| {
-                        settings_content
-                            .telemetry
-                            .get_or_insert_default()
-                            .diagnostics = value;
-                    },
-                }),
-                metadata: None,
-                files: USER,
-            }),
-            SettingsPageItem::SettingItem(SettingItem {
-                title: "Telemetry Metrics",
-                description: "Send anonymized usage data like what languages you're using Zed with.",
+                title: "Local Telemetry Log",
+                description: "Record usage events, like what languages you're using, to a local log file. The events are not sent anywhere.",
                 field: Box::new(SettingField {
                     json_path: Some("telemetry.metrics"),
                     pick: |settings_content| {

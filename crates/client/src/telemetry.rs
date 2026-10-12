@@ -7,28 +7,25 @@ use fs::Fs;
 use futures::channel::mpsc;
 use futures::{Future, StreamExt};
 use gpui::{App, AppContext as _, BackgroundExecutor, Task};
-use http_client::{self, AsyncBody, HttpClient, HttpClientWithUrl, Method, Request};
 use parking_lot::Mutex;
 use regex::Regex;
-use release_channel::ReleaseChannel;
 use settings::{Settings, SettingsStore};
-use sha2::{Digest, Sha256};
 use std::collections::HashSet;
 use std::fs::File;
 use std::io::Write;
 use std::sync::LazyLock;
 use std::time::Instant;
-use std::{env, mem, path::PathBuf, sync::Arc, time::Duration};
-use telemetry_events::{AssistantEventData, AssistantPhase, Event, EventRequestBody, EventWrapper};
+use std::{mem, path::PathBuf, sync::Arc, time::Duration};
+use telemetry_events::{AssistantEventData, AssistantPhase, Event};
 
 pub struct TelemetrySubscription {
     pub historical_events: Result<HistoricalEvents>,
-    pub queued_events: Vec<EventWrapper>,
-    pub live_events: mpsc::UnboundedReceiver<EventWrapper>,
+    pub queued_events: Vec<Event>,
+    pub live_events: mpsc::UnboundedReceiver<Event>,
 }
 
 pub struct HistoricalEvents {
-    pub events: Vec<EventWrapper>,
+    pub events: Vec<Event>,
     pub parse_error_count: usize,
 }
 use util::ResultExt as _;
@@ -37,33 +34,21 @@ use worktree::{UpdatedEntriesSet, WorktreeId};
 use self::event_coalescer::EventCoalescer;
 
 pub struct Telemetry {
-    clock: Arc<dyn SystemClock>,
-    http_client: Arc<HttpClientWithUrl>,
     executor: BackgroundExecutor,
     state: Arc<Mutex<TelemetryState>>,
 }
 
 struct TelemetryState {
     settings: TelemetrySettings,
-    system_id: Option<Arc<str>>,       // Per system
-    installation_id: Option<Arc<str>>, // Per app installation (different for dev, nightly, preview, and stable)
-    session_id: Option<String>,        // Per app launch
-    release_channel: Option<ReleaseChannel>,
-    architecture: &'static str,
-    events_queue: Vec<EventWrapper>,
+    events_queue: Vec<Event>,
     flush_events_task: Option<Task<()>>,
 
     log_file: Option<File>,
-    first_event_date_time: Option<Instant>,
     event_coalescer: EventCoalescer,
     max_queue_size: usize,
     worktrees_with_project_type_events_sent: HashSet<WorktreeId>,
 
-    os_name: String,
-    app_version: String,
-    os_version: Option<String>,
-
-    subscribers: Vec<mpsc::UnboundedSender<EventWrapper>>,
+    subscribers: Vec<mpsc::UnboundedSender<Event>>,
 }
 
 #[cfg(debug_assertions)]
@@ -77,28 +62,6 @@ const FLUSH_INTERVAL: Duration = Duration::from_secs(1);
 
 #[cfg(not(debug_assertions))]
 const FLUSH_INTERVAL: Duration = Duration::from_secs(60 * 5);
-static ZED_CLIENT_CHECKSUM_SEED: LazyLock<Option<Vec<u8>>> = LazyLock::new(|| {
-    option_env!("ZED_CLIENT_CHECKSUM_SEED")
-        .map(|s| s.as_bytes().into())
-        .or_else(|| {
-            env::var("ZED_CLIENT_CHECKSUM_SEED")
-                .ok()
-                .map(|s| s.as_bytes().into())
-        })
-});
-
-pub static MINIDUMP_ENDPOINT: LazyLock<Option<String>> = LazyLock::new(|| {
-    option_env!("ZED_MINIDUMP_ENDPOINT")
-        .map(str::to_string)
-        .or_else(|| env::var("ZED_MINIDUMP_ENDPOINT").ok())
-});
-
-pub fn should_install_crash_handler(channel: ReleaseChannel) -> bool {
-    matches!(
-        env::var("ZED_GENERATE_MINIDUMPS").as_deref(),
-        Ok("true" | "1")
-    ) || (channel != ReleaseChannel::Dev && MINIDUMP_ENDPOINT.is_some())
-}
 
 static DOTNET_PROJECT_FILES_REGEX: LazyLock<Regex> = LazyLock::new(|| {
     Regex::new(r"^(global\.json|Directory\.Build\.props|.*\.(csproj|fsproj|vbproj|sln))$").unwrap()
@@ -181,36 +144,20 @@ pub fn os_version() -> String {
 }
 
 impl Telemetry {
-    pub fn new(
-        clock: Arc<dyn SystemClock>,
-        client: Arc<HttpClientWithUrl>,
-        cx: &mut App,
-    ) -> Arc<Self> {
+    pub fn new(clock: Arc<dyn SystemClock>, cx: &mut App) -> Arc<Self> {
         let state = Arc::new(Mutex::new(TelemetryState {
             settings: *TelemetrySettings::get_global(cx),
-            architecture: env::consts::ARCH,
-            release_channel: ReleaseChannel::try_global(cx),
-            system_id: None,
-            installation_id: None,
-            session_id: None,
             events_queue: Vec::new(),
             flush_events_task: None,
             log_file: None,
-            first_event_date_time: None,
-            event_coalescer: EventCoalescer::new(clock.clone()),
+            event_coalescer: EventCoalescer::new(clock),
             max_queue_size: MAX_QUEUE_LEN,
             worktrees_with_project_type_events_sent: HashSet::new(),
-
-            os_version: None,
-            os_name: os_name(),
-            app_version: release_channel::AppVersion::global(cx).to_string(),
             subscribers: Vec::new(),
         }));
 
         cx.background_spawn({
             let state = state.clone();
-            let os_version = os_version();
-            state.lock().os_version = Some(os_version);
             async move {
                 if let Some(tempfile) = File::create(Self::log_file_path()).ok() {
                     state.lock().log_file = Some(tempfile);
@@ -230,8 +177,6 @@ impl Telemetry {
         .detach();
 
         let this = Arc::new(Self {
-            clock,
-            http_client: client,
             executor: cx.background_executor().clone(),
             state,
         });
@@ -288,7 +233,7 @@ impl Telemetry {
         let historical_events = self.read_log_file(fs).await;
 
         let mut state = self.state.lock();
-        let queued_events: Vec<EventWrapper> = state.events_queue.clone();
+        let queued_events = state.events_queue.clone();
 
         let (tx, rx) = mpsc::unbounded();
         state.subscribers.push(tx);
@@ -333,7 +278,7 @@ impl Telemetry {
             if line.trim().is_empty() {
                 continue;
             }
-            match serde_json::from_str::<EventWrapper>(line) {
+            match serde_json::from_str::<Event>(line) {
                 Ok(event) => events.push(event),
                 Err(_) => parse_error_count += 1,
             }
@@ -343,33 +288,6 @@ impl Telemetry {
             events,
             parse_error_count,
         })
-    }
-
-    pub fn has_checksum_seed(&self) -> bool {
-        ZED_CLIENT_CHECKSUM_SEED.is_some()
-    }
-
-    pub fn start(
-        self: &Arc<Self>,
-        system_id: Option<String>,
-        installation_id: Option<String>,
-        session_id: String,
-        cx: &App,
-    ) {
-        let mut state = self.state.lock();
-        state.system_id = system_id.map(|id| id.into());
-        state.installation_id = installation_id.map(|id| id.into());
-        state.session_id = Some(session_id);
-        state.app_version = release_channel::AppVersion::global(cx).to_string();
-        state.os_name = os_name();
-    }
-
-    pub fn metrics_enabled(self: &Arc<Self>) -> bool {
-        self.state.lock().settings.metrics
-    }
-
-    pub fn diagnostics_enabled(self: &Arc<Self>) -> bool {
-        self.state.lock().settings.diagnostics
     }
 
     pub fn report_assistant_event(self: &Arc<Self>, event: AssistantEventData) {
@@ -489,11 +407,10 @@ impl Telemetry {
 
     /// Report a telemetry event that originated on a remote server.
     ///
-    /// The remote server cannot upload telemetry itself, so it forwards events
-    /// (as a JSON-serialized [`Event`]) to the client. Since the OS metadata in
-    /// [`EventRequestBody`] is batch-level (describing the uploading client),
-    /// the remote server's OS is attached as event properties instead, so the
-    /// origin can still be distinguished downstream.
+    /// The remote server has no telemetry log of its own, so it forwards events
+    /// (as a JSON-serialized [`telemetry_events::FlexibleEvent`]) to the client.
+    /// The remote server's OS is attached as event properties, so the origin
+    /// can be distinguished in the client's log.
     pub fn report_remote_event(
         self: &Arc<Self>,
         event_json: &str,
@@ -527,22 +444,22 @@ impl Telemetry {
         Ok(())
     }
 
-    /// Returns a snapshot of the currently queued (not-yet-flushed) telemetry
-    /// events, for use in tests.
+    /// Returns a snapshot of the telemetry events that are queued but not yet
+    /// written to the log file, for use in tests.
     #[cfg(any(test, feature = "test-support"))]
     pub fn queued_events(self: &Arc<Self>) -> Vec<telemetry_events::FlexibleEvent> {
         self.state
             .lock()
             .events_queue
             .iter()
-            .map(|wrapper| {
-                let Event::Flexible(event) = &wrapper.event;
+            .map(|event| {
+                let Event::Flexible(event) = event;
                 event.clone()
             })
             .collect()
     }
 
-    fn report_event(self: &Arc<Self>, mut event: Event) {
+    fn report_event(self: &Arc<Self>, event: Event) {
         let mut state = self.state.lock();
         // RUST_LOG=telemetry=trace to debug telemetry events
         log::trace!(target: "telemetry", "{:?}", event);
@@ -550,12 +467,6 @@ impl Telemetry {
         if !state.settings.metrics {
             return;
         }
-
-        match &mut event {
-            Event::Flexible(event) => event
-                .event_properties
-                .insert("event_source".into(), "zed".into()),
-        };
 
         if state.flush_events_task.is_none() {
             let this = self.clone();
@@ -565,298 +476,179 @@ impl Telemetry {
             }));
         }
 
-        let date_time = self.clock.utc_now();
-
-        let milliseconds_since_first_event = match state.first_event_date_time {
-            Some(first_event_date_time) => date_time
-                .saturating_duration_since(first_event_date_time)
-                .min(Duration::from_secs(60 * 60 * 24))
-                .as_millis() as i64,
-            None => {
-                state.first_event_date_time = Some(date_time);
-                0
-            }
-        };
-
-        let event_wrapper = EventWrapper {
-            signed_in: false,
-            milliseconds_since_first_event,
-            event,
-        };
-
         state
             .subscribers
-            .retain(|tx| tx.unbounded_send(event_wrapper.clone()).is_ok());
+            .retain(|subscriber| subscriber.unbounded_send(event.clone()).is_ok());
 
-        state.events_queue.push(event_wrapper);
+        state.events_queue.push(event);
 
-        if state.installation_id.is_some() && state.events_queue.len() >= state.max_queue_size {
+        if state.events_queue.len() >= state.max_queue_size {
             drop(state);
             self.flush_events().detach();
         }
     }
 
-    pub fn system_id(self: &Arc<Self>) -> Option<Arc<str>> {
-        self.state.lock().system_id.clone()
-    }
+    fn write_queued_events_to_log(self: &Arc<Self>) -> Result<()> {
+        let mut state = self.state.lock();
+        let events = mem::take(&mut state.events_queue);
+        state.flush_events_task.take();
 
-    pub fn installation_id(self: &Arc<Self>) -> Option<Arc<str>> {
-        self.state.lock().installation_id.clone()
-    }
-
-    fn build_request(
-        self: &Arc<Self>,
-        // We take in the JSON bytes buffer so we can reuse the existing allocation.
-        mut json_bytes: Vec<u8>,
-        event_request: &EventRequestBody,
-    ) -> Result<Request<AsyncBody>> {
-        json_bytes.clear();
-        serde_json::to_writer(&mut json_bytes, event_request)?;
-
-        let checksum = calculate_json_checksum(&json_bytes).unwrap_or_default();
-
-        Ok(Request::builder()
-            .method(Method::POST)
-            .uri(
-                self.http_client
-                    .build_zed_api_url("/telemetry/events", &[])?
-                    .as_ref(),
-            )
-            .header("Content-Type", "application/json")
-            .header("x-zed-checksum", checksum)
-            .body(json_bytes.into())?)
-    }
-
-    pub async fn flush_events_inner(self: &Arc<Self>) -> Result<()> {
-        let (json_bytes, request_body) = {
-            let mut state = self.state.lock();
-            state.first_event_date_time = None;
-            let events = mem::take(&mut state.events_queue);
-            state.flush_events_task.take();
-            if events.is_empty() {
-                return Ok(());
-            }
-
+        if let Some(file) = &mut state.log_file {
             let mut json_bytes = Vec::new();
-
-            if let Some(file) = &mut state.log_file {
-                for event in &events {
-                    json_bytes.clear();
-                    serde_json::to_writer(&mut json_bytes, event)?;
-                    file.write_all(&json_bytes)?;
-                    file.write_all(b"\n")?;
-                }
+            for event in &events {
+                json_bytes.clear();
+                serde_json::to_writer(&mut json_bytes, event)?;
+                json_bytes.push(b'\n');
+                file.write_all(&json_bytes)?;
             }
-
-            (
-                json_bytes,
-                EventRequestBody {
-                    system_id: state.system_id.as_deref().map(Into::into),
-                    installation_id: state.installation_id.as_deref().map(Into::into),
-                    session_id: state.session_id.clone(),
-                    app_version: state.app_version.clone(),
-                    os_name: state.os_name.clone(),
-                    os_version: state.os_version.clone(),
-                    architecture: state.architecture.to_string(),
-
-                    release_channel: state
-                        .release_channel
-                        .map(|channel| channel.display_name().to_owned()),
-                    events,
-                },
-            )
-        };
-
-        let request = self.build_request(json_bytes, &request_body)?;
-        let response = self.http_client.send(request).await?;
-        if response.status() != 200 {
-            log::error!("Failed to send events: HTTP {:?}", response.status());
         }
 
-        anyhow::Ok(())
+        Ok(())
     }
 
+    /// Writes the queued events to the local telemetry log file.
     pub fn flush_events(self: &Arc<Self>) -> Task<()> {
         let this = self.clone();
         self.executor.spawn(async move {
-            this.flush_events_inner().await.log_err();
+            this.write_queued_events_to_log().log_err();
         })
     }
-}
-
-pub fn calculate_json_checksum(json: &impl AsRef<[u8]>) -> Option<String> {
-    let checksum_seed = ZED_CLIENT_CHECKSUM_SEED.as_ref()?;
-
-    let mut summer = Sha256::new();
-    summer.update(checksum_seed);
-    summer.update(json);
-    summer.update(checksum_seed);
-    let mut checksum = String::new();
-    for byte in summer.finalize().as_slice() {
-        use std::fmt::Write;
-        write!(&mut checksum, "{:02x}", byte).unwrap();
-    }
-
-    Some(checksum)
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::Client;
     use clock::FakeSystemClock;
 
-    use gpui::TestAppContext;
+    use gpui::{TestAppContext, UpdateGlobal as _};
     use http_client::FakeHttpClient;
+    use settings::ParseStatus;
     use std::collections::HashMap;
+    use std::sync::atomic::{AtomicUsize, Ordering};
     use telemetry_events::FlexibleEvent;
+    use tempfile::NamedTempFile;
     use util::rel_path::RelPath;
     use worktree::{PathChange, ProjectEntryId, WorktreeId};
 
     #[gpui::test]
-    async fn test_telemetry_flush_on_max_queue_size(
-        executor: BackgroundExecutor,
-        cx: &mut TestAppContext,
-    ) {
+    fn test_telemetry_metrics_are_disabled_by_default(cx: &mut TestAppContext) {
         init_test(cx);
-        let clock = Arc::new(FakeSystemClock::new());
-        let http = FakeHttpClient::with_200_response();
-        let system_id = Some("system_id".to_string());
-        let installation_id = Some("installation_id".to_string());
-        let session_id = "session_id".to_string();
 
-        let (telemetry, first_date_time, event) = cx.update(|cx| {
-            let telemetry = Telemetry::new(clock.clone(), http, cx);
-
-            telemetry.state.lock().max_queue_size = 4;
-            telemetry.start(system_id, installation_id, session_id, cx);
-
-            assert!(is_empty_state(&telemetry));
-
-            let first_date_time = clock.utc_now();
-            let event_properties = HashMap::from_iter([(
-                "test_key".to_string(),
-                serde_json::Value::String("test_value".to_string()),
-            )]);
-
-            let event = FlexibleEvent {
-                event_type: "test".to_string(),
-                event_properties,
-            };
-
-            (telemetry, first_date_time, event)
-        });
-
-        cx.update(|_cx| {
-            telemetry.report_event(Event::Flexible(event.clone()));
-            assert_eq!(telemetry.state.lock().events_queue.len(), 1);
-            assert!(telemetry.state.lock().flush_events_task.is_some());
-            assert_eq!(
-                telemetry.state.lock().first_event_date_time,
-                Some(first_date_time)
-            );
-
-            clock.advance(Duration::from_millis(100));
-
-            telemetry.report_event(Event::Flexible(event.clone()));
-            assert_eq!(telemetry.state.lock().events_queue.len(), 2);
-            assert!(telemetry.state.lock().flush_events_task.is_some());
-            assert_eq!(
-                telemetry.state.lock().first_event_date_time,
-                Some(first_date_time)
-            );
-
-            clock.advance(Duration::from_millis(100));
-
-            telemetry.report_event(Event::Flexible(event.clone()));
-            assert_eq!(telemetry.state.lock().events_queue.len(), 3);
-            assert!(telemetry.state.lock().flush_events_task.is_some());
-            assert_eq!(
-                telemetry.state.lock().first_event_date_time,
-                Some(first_date_time)
-            );
-
-            clock.advance(Duration::from_millis(100));
-
-            // Adding a 4th event should cause a flush
-            telemetry.report_event(Event::Flexible(event));
-        });
-
-        // Run the spawned flush task to completion
-        executor.run_until_parked();
-
-        cx.update(|_cx| {
-            assert!(is_empty_state(&telemetry));
+        cx.update(|cx| {
+            assert!(!TelemetrySettings::get_global(cx).metrics);
         });
     }
 
     #[gpui::test]
-    async fn test_telemetry_flush_on_flush_interval(
+    fn test_removed_diagnostics_setting_is_ignored(cx: &mut TestAppContext) {
+        init_test(cx);
+
+        cx.update(|cx| {
+            let result = SettingsStore::update_global(cx, |store, cx| {
+                store.set_user_settings(
+                    r#"{ "telemetry": { "diagnostics": true, "metrics": true } }"#,
+                    cx,
+                )
+            });
+            assert_eq!(result.parse_status, ParseStatus::Success);
+            assert!(TelemetrySettings::get_global(cx).metrics);
+        });
+    }
+
+    #[gpui::test]
+    async fn test_default_settings_record_nothing(
         executor: BackgroundExecutor,
         cx: &mut TestAppContext,
     ) {
         init_test(cx);
-        let clock = Arc::new(FakeSystemClock::new());
-        let http = FakeHttpClient::with_200_response();
-        let system_id = Some("system_id".to_string());
-        let installation_id = Some("installation_id".to_string());
-        let session_id = "session_id".to_string();
+        let (telemetry, request_count) = build_telemetry(cx);
+        let log_file = redirect_log_to_temporary_file(&telemetry, cx);
 
-        cx.update(|cx| {
-            let telemetry = Telemetry::new(clock.clone(), http, cx);
-            telemetry.state.lock().max_queue_size = 4;
-            telemetry.start(system_id, installation_id, session_id, cx);
+        for _ in 0..MAX_QUEUE_LEN + 1 {
+            telemetry.report_event(test_event());
+        }
+        assert!(is_empty_state(&telemetry));
 
-            assert!(is_empty_state(&telemetry));
-            let first_date_time = clock.utc_now();
+        executor.advance_clock(FLUSH_INTERVAL);
+        telemetry.flush_events().await;
 
-            let event_properties = HashMap::from_iter([(
-                "test_key".to_string(),
-                serde_json::Value::String("test_value".to_string()),
-            )]);
+        assert!(is_empty_state(&telemetry));
+        assert_eq!(read_log(&log_file), "");
+        assert_eq!(request_count.load(Ordering::SeqCst), 0);
+    }
 
-            let event = FlexibleEvent {
-                event_type: "test".to_string(),
-                event_properties,
-            };
+    #[gpui::test]
+    async fn test_enabled_metrics_write_local_log_on_flush_interval(
+        executor: BackgroundExecutor,
+        cx: &mut TestAppContext,
+    ) {
+        init_test(cx);
+        enable_metrics(cx);
+        let (telemetry, request_count) = build_telemetry(cx);
+        let log_file = redirect_log_to_temporary_file(&telemetry, cx);
 
-            telemetry.report_event(Event::Flexible(event));
-            assert_eq!(telemetry.state.lock().events_queue.len(), 1);
-            assert!(telemetry.state.lock().flush_events_task.is_some());
+        telemetry.report_event(test_event());
+        assert_eq!(telemetry.state.lock().events_queue.len(), 1);
+        assert!(telemetry.state.lock().flush_events_task.is_some());
+
+        executor.advance_clock(FLUSH_INTERVAL - Duration::from_millis(1));
+        assert!(!is_empty_state(&telemetry));
+        assert_eq!(read_log(&log_file), "");
+
+        executor.advance_clock(Duration::from_millis(1));
+        assert!(is_empty_state(&telemetry));
+        assert_eq!(logged_events(&log_file), vec![test_event()]);
+        assert_eq!(request_count.load(Ordering::SeqCst), 0);
+    }
+
+    #[gpui::test]
+    async fn test_enabled_metrics_write_local_log_on_max_queue_size(
+        executor: BackgroundExecutor,
+        cx: &mut TestAppContext,
+    ) {
+        init_test(cx);
+        enable_metrics(cx);
+        let (telemetry, request_count) = build_telemetry(cx);
+        let log_file = redirect_log_to_temporary_file(&telemetry, cx);
+        telemetry.state.lock().max_queue_size = 4;
+
+        for expected_queue_length in 1..4 {
+            telemetry.report_event(test_event());
             assert_eq!(
-                telemetry.state.lock().first_event_date_time,
-                Some(first_date_time)
+                telemetry.state.lock().events_queue.len(),
+                expected_queue_length
             );
+        }
+        assert_eq!(read_log(&log_file), "");
 
-            let duration = Duration::from_millis(1);
+        telemetry.report_event(test_event());
+        executor.run_until_parked();
 
-            // Test 1 millisecond before the flush interval limit is met
-            executor.advance_clock(FLUSH_INTERVAL - duration);
+        assert!(is_empty_state(&telemetry));
+        assert_eq!(logged_events(&log_file), vec![test_event(); 4]);
+        assert_eq!(request_count.load(Ordering::SeqCst), 0);
+    }
 
-            assert!(!is_empty_state(&telemetry));
+    #[gpui::test]
+    async fn test_disabling_metrics_stops_recording(cx: &mut TestAppContext) {
+        init_test(cx);
+        enable_metrics(cx);
+        let (telemetry, _request_count) = build_telemetry(cx);
 
-            // Test the exact moment the flush interval limit is met
-            executor.advance_clock(duration);
+        telemetry.report_event(test_event());
+        assert_eq!(telemetry.state.lock().events_queue.len(), 1);
 
-            assert!(is_empty_state(&telemetry));
-        });
+        set_metrics(false, cx);
+        telemetry.report_event(test_event());
+        assert_eq!(telemetry.state.lock().events_queue.len(), 1);
     }
 
     #[gpui::test]
     async fn test_report_remote_event_tags_origin(cx: &mut TestAppContext) {
         init_test(cx);
-        let clock = Arc::new(FakeSystemClock::new());
-        let http = FakeHttpClient::with_200_response();
-
-        let telemetry = cx.update(|cx| {
-            let telemetry = Telemetry::new(clock.clone(), http, cx);
-            telemetry.start(
-                Some("system_id".to_string()),
-                Some("installation_id".to_string()),
-                "session_id".to_string(),
-                cx,
-            );
-            telemetry
-        });
+        enable_metrics(cx);
+        let (telemetry, _request_count) = build_telemetry(cx);
 
         // Mirror what the remote server forwards: a bare `FlexibleEvent`, which
         // is the type produced by `telemetry::event!` / sent over the queue.
@@ -883,15 +675,13 @@ mod tests {
 
         let queue = telemetry.state.lock().events_queue.clone();
         assert_eq!(queue.len(), 1);
-        let Event::Flexible(event) = &queue[0].event;
+        let Event::Flexible(event) = &queue[0];
         assert_eq!(event.event_type, "fs_watcher_poll");
         // Original properties are preserved.
         assert_eq!(
             event.event_properties.get("path"),
             Some(&serde_json::Value::String("/code/project".to_string()))
         );
-        // The remote server's OS is attached as properties, since the batch-level
-        // OS describes the uploading client rather than the remote host.
         assert_eq!(
             event.event_properties.get("remote"),
             Some(&serde_json::Value::Bool(true))
@@ -919,8 +709,7 @@ mod tests {
         init_test(cx);
 
         let clock = Arc::new(FakeSystemClock::new());
-        let http = FakeHttpClient::with_200_response();
-        let telemetry = cx.update(|cx| Telemetry::new(clock.clone(), http, cx));
+        let telemetry = cx.update(|cx| Telemetry::new(clock, cx));
         let worktree_id = 1;
 
         // Scan of empty worktree finds nothing
@@ -943,8 +732,7 @@ mod tests {
         init_test(cx);
 
         let clock = Arc::new(FakeSystemClock::new());
-        let http = FakeHttpClient::with_200_response();
-        let telemetry = cx.update(|cx| Telemetry::new(clock.clone(), http, cx));
+        let telemetry = cx.update(|cx| Telemetry::new(clock, cx));
 
         test_project_discovery_helper(
             telemetry,
@@ -959,8 +747,7 @@ mod tests {
         init_test(cx);
 
         let clock = Arc::new(FakeSystemClock::new());
-        let http = FakeHttpClient::with_200_response();
-        let telemetry = cx.update(|cx| Telemetry::new(clock.clone(), http, cx));
+        let telemetry = cx.update(|cx| Telemetry::new(clock, cx));
 
         test_project_discovery_helper(
             telemetry,
@@ -975,8 +762,7 @@ mod tests {
         init_test(cx);
 
         let clock = Arc::new(FakeSystemClock::new());
-        let http = FakeHttpClient::with_200_response();
-        let telemetry = cx.update(|cx| Telemetry::new(clock.clone(), http, cx));
+        let telemetry = cx.update(|cx| Telemetry::new(clock, cx));
 
         // Using different worktrees, as production code blocks from reporting a
         // project type for the same worktree multiple times
@@ -1023,10 +809,6 @@ mod tests {
         );
     }
 
-    // TODO:
-    // Test settings
-    // Update FakeHTTPClient to keep track of the number of requests and assert on it
-
     fn init_test(cx: &mut TestAppContext) {
         cx.update(|cx| {
             let settings_store = SettingsStore::test(cx);
@@ -1034,10 +816,72 @@ mod tests {
         });
     }
 
+    fn set_metrics(enabled: bool, cx: &mut TestAppContext) {
+        cx.update(|cx| {
+            SettingsStore::update_global(cx, |store, cx| {
+                store.update_user_settings(cx, |content| {
+                    content.telemetry.get_or_insert_default().metrics = Some(enabled);
+                });
+            });
+        });
+    }
+
+    fn enable_metrics(cx: &mut TestAppContext) {
+        set_metrics(true, cx);
+    }
+
+    /// Builds the telemetry through a `Client` whose HTTP client counts every
+    /// request, so tests can assert that telemetry never touches the network.
+    fn build_telemetry(cx: &mut TestAppContext) -> (Arc<Telemetry>, Arc<AtomicUsize>) {
+        let request_count = Arc::new(AtomicUsize::new(0));
+        let http_client = FakeHttpClient::create({
+            let request_count = request_count.clone();
+            move |_| {
+                request_count.fetch_add(1, Ordering::SeqCst);
+                async move { anyhow::bail!("telemetry must not perform HTTP requests") }
+            }
+        });
+        let clock = Arc::new(FakeSystemClock::new());
+        let client = cx.update(|cx| Client::new(clock, http_client, cx));
+        (client.telemetry().clone(), request_count)
+    }
+
+    fn redirect_log_to_temporary_file(
+        telemetry: &Arc<Telemetry>,
+        cx: &mut TestAppContext,
+    ) -> NamedTempFile {
+        // Let the task that opens the real log file finish first, so that it
+        // cannot replace the temporary file afterwards.
+        cx.run_until_parked();
+        let log_file = NamedTempFile::new().unwrap();
+        telemetry.state.lock().log_file = Some(log_file.reopen().unwrap());
+        log_file
+    }
+
+    fn read_log(log_file: &NamedTempFile) -> String {
+        std::fs::read_to_string(log_file.path()).unwrap()
+    }
+
+    fn logged_events(log_file: &NamedTempFile) -> Vec<Event> {
+        read_log(log_file)
+            .lines()
+            .map(|line| serde_json::from_str(line).unwrap())
+            .collect()
+    }
+
+    fn test_event() -> Event {
+        Event::Flexible(FlexibleEvent {
+            event_type: "test".to_string(),
+            event_properties: HashMap::from_iter([(
+                "test_key".to_string(),
+                serde_json::Value::String("test_value".to_string()),
+            )]),
+        })
+    }
+
     fn is_empty_state(telemetry: &Telemetry) -> bool {
         telemetry.state.lock().events_queue.is_empty()
             && telemetry.state.lock().flush_events_task.is_none()
-            && telemetry.state.lock().first_event_date_time.is_none()
     }
 
     fn test_project_discovery_helper(

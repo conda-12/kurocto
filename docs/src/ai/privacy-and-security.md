@@ -50,8 +50,8 @@ on every platform where those models are offered.
 
 ## Controls and Related Privacy Docs {#controls-and-related-privacy-docs}
 
-- [Telemetry](../telemetry.md): What telemetry Zed collects and how to control
-  it.
+- [Telemetry](../telemetry.md): The optional local event log and local crash
+  diagnostics. Zed does not send telemetry.
 - [AI Quick Start](./quick-start.md#turn-ai-off): How to turn AI off.
 - [Privacy Policy](https://zed.dev/privacy-policy): Zed's privacy policy.
 - [Subprocessors](https://zed.dev/subprocessors): Zed's subprocessors.

@@ -242,89 +242,45 @@ fn render_theme_section(tab_index: &mut isize, cx: &mut App) -> impl IntoElement
 fn render_telemetry_section(tab_index: &mut isize, cx: &App) -> impl IntoElement {
     let fs = <dyn Fs>::global(cx);
 
-    v_flex()
-        .gap_4()
-        .child(
-            SwitchField::new(
-                "onboarding-telemetry-metrics",
-                None::<&str>,
-                Some("Help improve Zed by sending anonymous usage data".into()),
-                if TelemetrySettings::get_global(cx).metrics {
-                    ui::ToggleState::Selected
-                } else {
-                    ui::ToggleState::Unselected
-                },
-                {
-                    let fs = fs.clone();
-                    move |selection, _, cx| {
-                        let enabled = match selection {
-                            ToggleState::Selected => true,
-                            ToggleState::Unselected => false,
-                            ToggleState::Indeterminate => {
-                                return;
-                            }
-                        };
+    v_flex().gap_4().child(
+        SwitchField::new(
+            "onboarding-telemetry-metrics",
+            None::<&str>,
+            Some(
+                "Record usage events to a local log file. The events are not sent anywhere.".into(),
+            ),
+            if TelemetrySettings::get_global(cx).metrics {
+                ui::ToggleState::Selected
+            } else {
+                ui::ToggleState::Unselected
+            },
+            {
+                let fs = fs.clone();
+                move |selection, _, cx| {
+                    let enabled = match selection {
+                        ToggleState::Selected => true,
+                        ToggleState::Unselected => false,
+                        ToggleState::Indeterminate => {
+                            return;
+                        }
+                    };
 
-                        update_settings_file(fs.clone(), cx, move |setting, _| {
-                            setting.telemetry.get_or_insert_default().metrics = Some(enabled);
-                        });
+                    update_settings_file(fs.clone(), cx, move |setting, _| {
+                        setting.telemetry.get_or_insert_default().metrics = Some(enabled);
+                    });
 
-                        // This telemetry event shouldn't fire when it's off. If it does we'll be alerted
-                        // and can fix it in a timely manner to respect a user's choice.
-                        telemetry::event!(
-                            "Welcome Page Telemetry Metrics Toggled",
-                            options = if enabled { "on" } else { "off" }
-                        );
-                    }
-                },
-            )
-            .tab_index({
-                *tab_index += 1;
-                *tab_index
-            }),
+                    telemetry::event!(
+                        "Welcome Page Telemetry Metrics Toggled",
+                        options = if enabled { "on" } else { "off" }
+                    );
+                }
+            },
         )
-        .child(
-            SwitchField::new(
-                "onboarding-telemetry-crash-reports",
-                None::<&str>,
-                Some(
-                    "Help fix Zed by sending crash reports so we can fix critical issues fast"
-                        .into(),
-                ),
-                if TelemetrySettings::get_global(cx).diagnostics {
-                    ui::ToggleState::Selected
-                } else {
-                    ui::ToggleState::Unselected
-                },
-                {
-                    let fs = fs.clone();
-                    move |selection, _, cx| {
-                        let enabled = match selection {
-                            ToggleState::Selected => true,
-                            ToggleState::Unselected => false,
-                            ToggleState::Indeterminate => {
-                                return;
-                            }
-                        };
-
-                        update_settings_file(fs.clone(), cx, move |setting, _| {
-                            setting.telemetry.get_or_insert_default().diagnostics = Some(enabled);
-                        });
-
-                        // This telemetry event shouldn't fire when it's off. If it does we'll be alerted
-                        // and can fix it in a timely manner to respect a user's choice.
-                        telemetry::event!(
-                            "Welcome Page Telemetry Diagnostics Toggled",
-                            options = if enabled { "on" } else { "off" }
-                        );
-                    }
-                },
-            )
-            .tab_index({
-                *tab_index += 1;
-                *tab_index
-            }),
-        )
+        .tab_index({
+            *tab_index += 1;
+            *tab_index
+        }),
+    )
 }
 
 fn render_base_keymap_section(tab_index: &mut isize, cx: &mut App) -> impl IntoElement {
