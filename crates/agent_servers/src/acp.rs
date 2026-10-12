@@ -2131,7 +2131,7 @@ pub mod test_support {
 
     use acp_thread::{
         AgentSessionClientUserMessageIds, AgentSessionConfigOptions, AgentSessionModes,
-        AgentSessionRetry, AgentSessionSetTitle, AgentSessionTruncate, AgentTelemetry,
+        AgentSessionRetry, AgentSessionSetTitle, AgentSessionTruncate,
     };
 
     use super::*;
@@ -2409,10 +2409,6 @@ pub mod test_support {
             cx: &App,
         ) -> Option<Rc<dyn AgentSessionSetTitle>> {
             self.inner.set_title(session_id, cx)
-        }
-
-        fn telemetry(&self) -> Option<Rc<dyn AgentTelemetry>> {
-            self.inner.telemetry()
         }
 
         fn session_modes(

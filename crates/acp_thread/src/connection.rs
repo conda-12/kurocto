@@ -258,10 +258,6 @@ pub trait AgentConnection {
         None
     }
 
-    fn telemetry(&self) -> Option<Rc<dyn AgentTelemetry>> {
-        None
-    }
-
     fn session_modes(
         &self,
         _session_id: &acp_v2::SessionId,
@@ -324,16 +320,6 @@ pub trait AgentSessionRetry {
 
 pub trait AgentSessionSetTitle {
     fn run(&self, title: SharedString, cx: &mut App) -> Task<Result<()>>;
-}
-
-pub trait AgentTelemetry {
-    /// A representation of the current thread state that can be serialized for
-    /// storage with telemetry events.
-    fn thread_data(
-        &self,
-        session_id: &acp_v2::SessionId,
-        cx: &mut App,
-    ) -> Task<Result<serde_json::Value>>;
 }
 
 pub trait AgentSessionModes {

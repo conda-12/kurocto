@@ -347,7 +347,7 @@ pub struct AgentSettingsContent {
     /// earlier messages to free up room in the model's context window once the
     /// context grows too large.
     pub auto_compact: Option<AutoCompactSettingsContent>,
-    /// Whether to show thumb buttons for feedback in the agent panel.
+    /// Whether to show thumb buttons for rating inline assistant results.
     ///
     /// Default: true
     pub enable_feedback: Option<bool>,

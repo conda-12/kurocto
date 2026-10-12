@@ -1,6 +1,6 @@
 use gh_workflow::{
-    Container, Event, Expression, Input, Job, Level, MergeGroup, Permissions, Port, PullRequest,
-    Push, Run, Step, Strategy, Use, UsesJob, Workflow,
+    Event, Expression, Input, Job, Level, MergeGroup, Permissions, PullRequest, Push, Run, Step,
+    Strategy, Use, UsesJob, Workflow,
 };
 use indexmap::IndexMap;
 use indoc::formatdoc;
@@ -608,7 +608,6 @@ fn check_workspace_binaries() -> NamedJob {
             .add_step(steps::cache_rust_dependencies_namespace())
             .map(steps::install_linux_dependencies)
             .add_step(steps::setup_sccache(Platform::Linux))
-            .add_step(steps::script("cargo build -p collab"))
             .add_step(steps::script(
                 "cargo build --workspace --bins --examples --features project_benchmarks/test-support",
             ))
@@ -678,20 +677,6 @@ fn run_platform_tests_impl(platform: Platform, filter_packages: bool, harden: bo
             .runs_on(runner)
             .when(platform == Platform::Mac, |job| {
                 job.add_env(("RUST_LIB_BACKTRACE", 0))
-            })
-            .when(platform == Platform::Linux, |job| {
-                job.add_service(
-                    "postgres",
-                    Container::new("postgres:15@sha256:1b92e7a80c021647bf70f5d3eb66066a998e4f5cf43c07bb9dc9f729782cf88e")
-                        .add_env(("POSTGRES_HOST_AUTH_METHOD", "trust"))
-                        .ports(vec![Port::Name("5432:5432".into())])
-                        .options(
-                            "--health-cmd pg_isready \
-                             --health-interval 500ms \
-                             --health-timeout 5s \
-                             --health-retries 10",
-                        ),
-                )
             })
             .when(harden && platform == Platform::Linux, |this| {
                 this.add_step(steps::harden_runner())

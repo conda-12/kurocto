@@ -87,14 +87,6 @@ jobs:
       run: |
         rm -rf ./../.cargo
     timeout-minutes: 60
-    services:
-      postgres:
-        image: postgres:15@sha256:1b92e7a80c021647bf70f5d3eb66066a998e4f5cf43c07bb9dc9f729782cf88e
-        env:
-          POSTGRES_HOST_AUTH_METHOD: trust
-        ports:
-        - 5432:5432
-        options: --health-cmd pg_isready --health-interval 500ms --health-timeout 5s --health-retries 10
   bundle_linux_aarch64:
     needs:
     - run_tests_linux

@@ -430,14 +430,6 @@ jobs:
       run: |
         rm -rf ./../.cargo
     timeout-minutes: 60
-    services:
-      postgres:
-        image: postgres:15@sha256:1b92e7a80c021647bf70f5d3eb66066a998e4f5cf43c07bb9dc9f729782cf88e
-        env:
-          POSTGRES_HOST_AUTH_METHOD: trust
-        ports:
-        - 5432:5432
-        options: --health-cmd pg_isready --health-interval 500ms --health-timeout 5s --health-retries 10
   run_tests_mac:
     needs:
     - orchestrate
@@ -612,8 +604,6 @@ jobs:
         R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
         R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
         SCCACHE_BUCKET: sccache-zed
-    - name: cargo build -p collab
-      run: cargo build -p collab
     - name: cargo build --workspace --bins --examples --features project_benchmarks/test-support
       run: cargo build --workspace --bins --examples --features project_benchmarks/test-support
     - name: steps::show_sccache_stats

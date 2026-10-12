@@ -1272,7 +1272,7 @@
       // 0 is not a valid threshold.
       "threshold": "90%",
     },
-    // When enabled, show voting thumbs for feedback on agent edits.
+    // When enabled, show voting thumbs for rating inline assistant results.
     "enable_feedback": true,
     "default_profile": "write",
     "profiles": {
