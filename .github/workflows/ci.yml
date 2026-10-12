@@ -1,0 +1,112 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: always
+  CARGO_INCREMENTAL: 0
+  RUST_BACKTRACE: 1
+
+jobs:
+  style:
+    name: Formatting and licenses
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check formatting
+        run: cargo fmt --all -- --check
+      - name: Check crate licenses
+        run: ./script/check-licenses
+
+  clippy_linux:
+    name: Clippy (Linux)
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+      - name: Free disk space
+        run: ./script/ci-free-disk-space
+      - name: Use the CI cargo config
+        run: |
+          mkdir -p ../.cargo
+          cp .cargo/ci-config.toml ../.cargo/config.toml
+      - name: Install Linux dependencies
+        run: ./script/linux
+      - uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: linux
+          cache-targets: false
+      - name: Clippy
+        run: cargo clippy --workspace --all-targets -- --deny warnings
+
+  clippy_macos:
+    name: Clippy (macOS)
+    runs-on: macos-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+      - name: Use the CI cargo config
+        run: |
+          mkdir -p ../.cargo
+          cp .cargo/ci-config.toml ../.cargo/config.toml
+      - uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: macos
+          cache-targets: false
+      - name: Clippy
+        run: cargo clippy --workspace --all-targets -- --deny warnings
+
+  check_windows:
+    name: Check (Windows)
+    runs-on: windows-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+      - uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: windows
+          cache-targets: false
+      - name: Check
+        run: cargo check --package zed --package cli --package remote_server
+
+  tests_linux:
+    name: Tests (Linux, core crates)
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+      - name: Free disk space
+        run: ./script/ci-free-disk-space
+      - name: Use the CI cargo config
+        run: |
+          mkdir -p ../.cargo
+          cp .cargo/ci-config.toml ../.cargo/config.toml
+      - name: Install Linux dependencies
+        run: ./script/linux
+      - uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: linux
+          cache-targets: false
+      - uses: taiki-e/install-action@nextest
+      # The whole suite needs far more disk and time than a hosted runner has. These crates cover
+      # the core data structures and the code that must not contact Zed-operated services. The
+      # excluded test compiles an extension to WebAssembly, which needs the WASI SDK.
+      - name: Run tests
+        run: >
+          cargo nextest run --no-fail-fast
+          --package text --package rope --package sum_tree --package clock --package collections
+          --package util --package paths --package release_channel --package http_client
+          --package settings --package fuzzy --package client --package crashes
+          --package context_server --package extension_host
+          -E 'not test(test_extension_store_with_test_extension)'
