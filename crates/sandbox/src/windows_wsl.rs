@@ -215,12 +215,7 @@ pub fn wsl_distro_registered() -> bool {
 /// `/...`; `\\wsl.localhost\...` and other shapes are rejected. There is no
 /// distro to pin — a sandboxed command runs in exactly one distro (the project's
 /// or WSL's default), so a bare Linux path is unambiguous.
-pub async fn resolve_canonical_for_grant(
-    requested: PathBuf,
-    // The helper is supplied through `ZED_WSL_SANDBOX_HELPER` rather than
-    // provisioned for a release, so the release no longer selects anything here.
-    _wsl_zed_release: (String, String),
-) -> Result<ResolvedGrant> {
+pub async fn resolve_canonical_for_grant(requested: PathBuf) -> Result<ResolvedGrant> {
     let path_string = requested.to_string_lossy();
 
     // A Windows drive grant (NTFS) is resolved on the Windows host, which is
@@ -366,13 +361,12 @@ pub async fn wrap_invocation<S: std::hash::BuildHasher>(
     permissions: SandboxPermissions,
     cwd: Option<PathBuf>,
     env: HashMap<String, String, S>,
-    // When `Some`, the Linux `zed` supplied through `ZED_WSL_SANDBOX_HELPER` is
-    // run as the `--wsl-sandbox-helper`; the release itself selects nothing. When
-    // `None`, no helper is used and bwrap is exec'd directly — the legacy path,
-    // which binds writable paths by string and so carries the bind-source TOCTOU
-    // the helper closes. Callers that can determine the running release should
-    // always pass `Some`.
-    wsl_zed_release: Option<(String, String)>,
+    // When `true`, the Linux `zed` supplied through `ZED_WSL_SANDBOX_HELPER` is
+    // run as the `--wsl-sandbox-helper`, and wrapping fails if none is supplied.
+    // When `false`, no helper is used and bwrap is exec'd directly — the legacy
+    // path, which binds writable paths by string and so carries the bind-source
+    // TOCTOU the helper closes.
+    use_wsl_sandbox_helper: bool,
 ) -> Result<(String, Vec<String>)> {
     // Mapping failures are bad requests (a path that doesn't exist or has a
     // shape WSL can't address), not environment problems, so no
@@ -476,35 +470,32 @@ pub async fn wrap_invocation<S: std::hash::BuildHasher>(
         &env,
     );
 
-    match wsl_zed_release {
+    if use_wsl_sandbox_helper {
         // Preferred path: run the in-WSL `zed` as the sandbox helper, which
         // verifies and pins the persisted canonical writable paths WSL-side,
         // then validates them again after bwrap's mounts.
-        Some(_) => {
-            let helper = supplied_wsl_zed_helper()?;
-            wsl_args.extend(["--exec".to_string(), helper]);
-            // Protocol (decoded by `linux_bubblewrap::decode_wsl_helper_args`):
-            //   <flag> <bwrap_path> <n_base> <base...> <n_writable> <writable...> -- <prog> <args>
-            wsl_args.push(crate::WSL_SANDBOX_HELPER_FLAG.to_string());
-            wsl_args.push(environment.bwrap_path.clone());
-            wsl_args.push(bwrap_options.len().to_string());
-            wsl_args.extend(bwrap_options);
-            wsl_args.push(writable_paths.len().to_string());
-            wsl_args.extend(writable_paths.iter().cloned());
-            wsl_args.push("--".to_string());
-            wsl_args.push(program);
-            wsl_args.extend(args);
-        }
+        let helper = supplied_wsl_zed_helper()?;
+        wsl_args.extend(["--exec".to_string(), helper]);
+        // Protocol (decoded by `linux_bubblewrap::decode_wsl_helper_args`):
+        //   <flag> <bwrap_path> <n_base> <base...> <n_writable> <writable...> -- <prog> <args>
+        wsl_args.push(crate::WSL_SANDBOX_HELPER_FLAG.to_string());
+        wsl_args.push(environment.bwrap_path.clone());
+        wsl_args.push(bwrap_options.len().to_string());
+        wsl_args.extend(bwrap_options);
+        wsl_args.push(writable_paths.len().to_string());
+        wsl_args.extend(writable_paths.iter().cloned());
+        wsl_args.push("--".to_string());
+        wsl_args.push(program);
+        wsl_args.extend(args);
+    } else {
         // Legacy path: exec bwrap directly (no in-sandbox bind validation). Use
         // the absolute path the probe validated, since `wsl --exec` searches
         // only the default WSL PATH.
-        None => {
-            wsl_args.extend(["--exec".to_string(), environment.bwrap_path.clone()]);
-            wsl_args.extend(bwrap_options);
-            wsl_args.push("--".to_string());
-            wsl_args.push(program);
-            wsl_args.extend(args);
-        }
+        wsl_args.extend(["--exec".to_string(), environment.bwrap_path.clone()]);
+        wsl_args.extend(bwrap_options);
+        wsl_args.push("--".to_string());
+        wsl_args.push(program);
+        wsl_args.extend(args);
     }
 
     Ok((wsl_exe.to_string_lossy().into_owned(), wsl_args))
@@ -1363,7 +1354,7 @@ mod tests {
             SandboxPermissions::default(),
             None,
             HashMap::<String, String>::new(),
-            None,
+            false,
         ));
     }
 

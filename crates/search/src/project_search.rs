@@ -400,8 +400,7 @@ impl ProjectSearch {
         workspace: WeakEntity<Workspace>,
         cx: &mut Context<Self>,
     ) -> Self {
-        let capability = project.read(cx).capability();
-        let excerpts = cx.new(|_| MultiBuffer::new(capability));
+        let excerpts = cx.new(|_| MultiBuffer::new(language::Capability::ReadWrite));
         let excerpts_subscription = Self::subscribe_to_excerpts(&excerpts, cx);
         let workspace_subscription = Self::subscribe_to_workspace(&workspace, cx);
 
@@ -3478,7 +3477,7 @@ fn is_buffer_stale(
             .read(cx)
             .buffer_store()
             .read(cx)
-            .is_shared(buffer.remote_id(), cx)
+            .is_shared(buffer.remote_id())
     } else {
         false
     }

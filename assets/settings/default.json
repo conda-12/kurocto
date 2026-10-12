@@ -252,8 +252,6 @@
   // ${appName}, ${branch}, and ${separator}.
   // ${separator} is omitted when adjacent variables are empty,
   // but literal text is preserved.
-  // The collaboration indicator, when present, is appended after the
-  // rendered template.
   // If the template renders to nothing, the default template is used instead.
   //
   // Default: "${projectName}${separator}${fileName}"
@@ -630,10 +628,6 @@
     // `null` means use system default.
     // Any unrecognized output device will fall back to system default.
     "experimental.output_audio_device": null,
-    // Select specific input audio device.
-    // `null` means use system default.
-    // Any unrecognized input device will fall back to system default.
-    "experimental.input_audio_device": null,
   },
   // Scrollbar related settings
   "scrollbar": {

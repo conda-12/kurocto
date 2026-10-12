@@ -42,3 +42,8 @@ slow-timeout = { period = "300s", terminate-after = 1 }
 [[profile.default.overrides]]
 filter =  'package(editor) and test(test_random_blocks)'
 slow-timeout = { period = "300s", terminate-after = 1 }
+
+# Randomized tests run many iterations and pass 60s on slower hosted CI runners.
+[[profile.default.overrides]]
+filter = 'test(/test_random_/)'
+slow-timeout = { period = "300s", terminate-after = 1 }

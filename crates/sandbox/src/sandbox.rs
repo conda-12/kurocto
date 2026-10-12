@@ -498,13 +498,11 @@ pub struct Sandbox {
     /// with writable binds); a `Sandbox` normally wraps a single command.
     #[cfg(target_os = "linux")]
     validation_fd_sender: Option<linux_bubblewrap::ValidationFdSender>,
-    /// Windows only: `(release channel, version)` of the Linux `zed` to
-    /// provision inside WSL as the `--wsl-sandbox-helper` (version `latest` for
-    /// dev builds). Set by the caller (which has the running release info);
-    /// `None` falls back to exec'ing bwrap directly without in-sandbox bind
-    /// validation.
+    /// Windows only: whether to run the Linux `zed` supplied through
+    /// `ZED_WSL_SANDBOX_HELPER` as the `--wsl-sandbox-helper`. `false` falls
+    /// back to exec'ing bwrap directly without in-sandbox bind validation.
     #[cfg(target_os = "windows")]
-    wsl_zed_release: Option<(String, String)>,
+    use_wsl_sandbox_helper: bool,
     #[cfg(target_os = "macos")]
     seatbelt_config: Option<macos_seatbelt::SeatbeltConfigFile>,
 }
@@ -554,21 +552,20 @@ impl Sandbox {
             #[cfg(target_os = "linux")]
             validation_fd_sender: None,
             #[cfg(target_os = "windows")]
-            wsl_zed_release: None,
+            use_wsl_sandbox_helper: false,
             #[cfg(target_os = "macos")]
             seatbelt_config: None,
         })
     }
 
-    /// Windows only: record the `(release channel, version)` of the Linux `zed`
-    /// to provision inside WSL as the sandbox helper (version `latest` for dev
-    /// builds). The caller resolves these from the running app's release info
-    /// (which this low-level crate can't read) and sets them before `wrap`. When
-    /// unset, the WSL backend falls back to exec'ing bwrap directly without
-    /// in-sandbox bind validation.
+    /// Windows only: run the Linux `zed` supplied through
+    /// `ZED_WSL_SANDBOX_HELPER` as the sandbox helper inside WSL. Call before
+    /// `wrap`, which then fails if no helper is supplied. When not called, the
+    /// WSL backend falls back to exec'ing bwrap directly without in-sandbox
+    /// bind validation.
     #[cfg(target_os = "windows")]
-    pub fn set_wsl_zed_release(&mut self, channel: String, version: String) {
-        self.wsl_zed_release = Some((channel, version));
+    pub fn use_wsl_sandbox_helper(&mut self) {
+        self.use_wsl_sandbox_helper = true;
     }
 
     /// Check whether the platform sandbox can be created on this host without
@@ -902,7 +899,7 @@ impl Sandbox {
             permissions,
             command.cwd.clone(),
             command.env.clone(),
-            self.wsl_zed_release.clone(),
+            self.use_wsl_sandbox_helper,
         )
         .await
         .map_err(map_anyhow_error)?;

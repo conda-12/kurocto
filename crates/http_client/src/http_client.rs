@@ -10,6 +10,7 @@ pub use http::{self, Method, Request, Response, StatusCode, Uri, request::Builde
 use http::{HeaderName, HeaderValue};
 
 use futures::future::BoxFuture;
+#[cfg(feature = "test-support")]
 use parking_lot::Mutex;
 #[cfg(feature = "test-support")]
 use std::{any::type_name, fmt};

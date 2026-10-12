@@ -9,14 +9,10 @@ use workspace::{
 
 use crate::open_remote_project;
 
-enum Host {
-    CollabGuestProject,
-    RemoteServerProject(RemoteConnectionOptions, bool),
-}
-
 pub struct DisconnectedOverlay {
     workspace: WeakEntity<Workspace>,
-    host: Host,
+    remote_connection_options: RemoteConnectionOptions,
+    server_not_running: bool,
     focus_handle: FocusHandle,
     finished: bool,
 }
@@ -53,34 +49,23 @@ impl DisconnectedOverlay {
             workspace.project(),
             window,
             |workspace, project, event, window, cx| {
-                if !matches!(
-                    event,
-                    project::Event::DisconnectedFromHost
-                        | project::Event::DisconnectedFromRemote { .. }
-                ) {
+                let project::Event::DisconnectedFromRemote { server_not_running } = event else {
                     return;
-                }
+                };
+                let server_not_running = *server_not_running;
                 let handle = cx.entity().downgrade();
 
-                let remote_connection_options = project.read(cx).remote_connection_options(cx);
-                let host = if let Some(remote_connection_options) = remote_connection_options {
-                    Host::RemoteServerProject(
-                        remote_connection_options,
-                        matches!(
-                            event,
-                            project::Event::DisconnectedFromRemote {
-                                server_not_running: true
-                            }
-                        ),
-                    )
-                } else {
-                    Host::CollabGuestProject
+                let Some(remote_connection_options) =
+                    project.read(cx).remote_connection_options(cx)
+                else {
+                    return;
                 };
 
                 workspace.toggle_modal(window, cx, |_, cx| DisconnectedOverlay {
                     finished: false,
                     workspace: handle,
-                    host,
+                    remote_connection_options,
+                    server_not_running,
                     focus_handle: cx.focus_handle(),
                 });
             },
@@ -92,9 +77,7 @@ impl DisconnectedOverlay {
         self.finished = true;
         cx.emit(DismissEvent);
 
-        if let Host::RemoteServerProject(remote_connection_options, _) = &self.host {
-            self.reconnect_to_remote_project(remote_connection_options.clone(), window, cx);
-        }
+        self.reconnect_to_remote_project(self.remote_connection_options.clone(), window, cx);
     }
 
     fn reconnect_to_remote_project(
@@ -144,32 +127,23 @@ impl DisconnectedOverlay {
 
 impl Render for DisconnectedOverlay {
     fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
-        let can_reconnect = matches!(self.host, Host::RemoteServerProject(..));
-
-        let message = match &self.host {
-            Host::CollabGuestProject => {
-                "Your connection to the remote project has been lost.".to_string()
-            }
-            Host::RemoteServerProject(options, server_not_running) => {
-                let autosave = if ProjectSettings::get_global(cx)
-                    .session
-                    .restore_unsaved_buffers
-                {
-                    "\nUnsaved changes are stored locally."
-                } else {
-                    ""
-                };
-                let reason = if *server_not_running {
-                    "process exiting unexpectedly"
-                } else {
-                    "not responding"
-                };
-                format!(
-                    "Your connection to {} has been lost due to the server {reason}.{autosave}",
-                    options.display_name(),
-                )
-            }
+        let autosave = if ProjectSettings::get_global(cx)
+            .session
+            .restore_unsaved_buffers
+        {
+            "\nUnsaved changes are stored locally."
+        } else {
+            ""
         };
+        let reason = if self.server_not_running {
+            "process exiting unexpectedly"
+        } else {
+            "not responding"
+        };
+        let message = format!(
+            "Your connection to {} has been lost due to the server {reason}.{autosave}",
+            self.remote_connection_options.display_name(),
+        );
 
         div()
             .track_focus(&self.focus_handle(cx))
@@ -198,15 +172,13 @@ impl Render for DisconnectedOverlay {
                                             window.remove_window();
                                         })),
                                 )
-                                .when(can_reconnect, |el| {
-                                    el.child(
-                                        Button::new("reconnect", "Reconnect")
-                                            .style(ButtonStyle::Filled)
-                                            .layer(ElevationIndex::ModalSurface)
-                                            .start_icon(Icon::new(IconName::ArrowCircle))
-                                            .on_click(cx.listener(Self::handle_reconnect)),
-                                    )
-                                }),
+                                .child(
+                                    Button::new("reconnect", "Reconnect")
+                                        .style(ButtonStyle::Filled)
+                                        .layer(ElevationIndex::ModalSurface)
+                                        .start_icon(Icon::new(IconName::ArrowCircle))
+                                        .on_click(cx.listener(Self::handle_reconnect)),
+                                ),
                         ),
                     ),
             )

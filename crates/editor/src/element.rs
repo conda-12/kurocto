@@ -79,7 +79,7 @@ use std::{
     cmp::{self, Ordering},
     fmt::{self, Write},
     iter, mem,
-    ops::{Deref, Range},
+    ops::Range,
     rc::Rc,
     sync::Arc,
     time::{Duration, Instant},
@@ -992,38 +992,18 @@ impl EditorElement {
                 }
             }
 
-            if let Some(collaboration_hub) = &editor.collaboration_hub {
-                // When following someone, render the local selections in their color.
-                if let Some(leader_id) = editor.leader_id {
-                    match leader_id {
-                        CollaboratorId::PeerId(peer_id) => {
-                            if let Some(collaborator) =
-                                collaboration_hub.collaborators(cx).get(&peer_id)
-                                && let Some(participant_index) = collaboration_hub
-                                    .user_participant_indices(cx)
-                                    .get(&collaborator.user_id)
-                                && let Some((local_selection_style, _)) = selections.first_mut()
-                            {
-                                *local_selection_style = cx
-                                    .theme()
-                                    .players()
-                                    .color_for_participant(participant_index.0);
-                            }
-                        }
-                        CollaboratorId::Agent => {
-                            if let Some((local_selection_style, _)) = selections.first_mut() {
-                                *local_selection_style = cx.theme().players().agent();
-                            }
-                        }
-                    }
+            if editor.show_remote_selections {
+                // When following the agent, render the local selections in its color.
+                if editor.leader_id == Some(CollaboratorId::Agent)
+                    && let Some((local_selection_style, _)) = selections.first_mut()
+                {
+                    *local_selection_style = cx.theme().players().agent();
                 }
 
                 let mut remote_selections = HashMap::default();
-                for selection in snapshot.remote_selections_in_range(
-                    &(start_anchor..end_anchor),
-                    collaboration_hub.as_ref(),
-                    cx,
-                ) {
+                for selection in
+                    snapshot.remote_selections_in_range(&(start_anchor..end_anchor), cx)
+                {
                     // Don't re-render the leader's selections, since the local selections
                     // match theirs.
                     if Some(selection.collaborator_id) == editor.leader_id {
@@ -1101,12 +1081,10 @@ impl EditorElement {
             cursors.push((anchor.to_display_point(&snapshot.display_snapshot), color));
         };
         // Remote cursors
-        if let Some(collaboration_hub) = &editor.collaboration_hub {
-            for remote_selection in snapshot.remote_selections_in_range(
-                &(Anchor::Min..Anchor::Max),
-                collaboration_hub.deref(),
-                cx,
-            ) {
+        if editor.show_remote_selections {
+            for remote_selection in
+                snapshot.remote_selections_in_range(&(Anchor::Min..Anchor::Max), cx)
+            {
                 add_cursor(
                     remote_selection.selection.head(),
                     remote_selection.color.cursor,

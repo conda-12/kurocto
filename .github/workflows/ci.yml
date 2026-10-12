@@ -80,10 +80,42 @@ jobs:
       - name: Check
         run: cargo check --package zed --package cli --package remote_server --package explorer_command_injector
 
+  # The whole suite does not fit on one hosted runner's disk, so it is split into shards that each
+  # build a slice of the workspace. Crates not listed in any shard are compiled by clippy but
+  # their tests do not run.
   tests_linux:
-    name: Tests (Linux, core crates)
+    name: Tests (Linux, ${{ matrix.shard.name }})
     runs-on: ubuntu-latest
-    timeout-minutes: 120
+    timeout-minutes: 150
+    strategy:
+      fail-fast: false
+      matrix:
+        shard:
+          - name: core
+            packages: >-
+              --package text --package rope --package sum_tree --package clock --package collections --package util --package paths --package release_channel --package http_client --package settings --package fuzzy --package client --package crashes --package context_server --package extension_host
+          - name: editor
+            packages: >-
+              --package editor --package multi_buffer --package language --package languages
+              --package markdown --package search --package vim
+          - name: project
+            packages: >-
+              --package project --package worktree --package fs --package git --package lsp
+              --package remote --package remote_server --package task --package terminal
+          - name: workspace
+            packages: >-
+              --package workspace --package file_finder --package project_panel
+              --package outline_panel --package git_ui --package terminal_view
+              --package settings_ui --package extensions_ui --package title_bar
+              --package command_palette --package recent_projects
+          - name: agent
+            packages: >-
+              --package agent --package agent_ui --package acp_thread --package agent_servers
+              --package language_models --package language_model --package edit_prediction
+              --package agent_settings
+          - name: app
+            packages: >-
+              --package zed --package cli
     steps:
       - uses: actions/checkout@v5
       - name: Free disk space
@@ -94,19 +126,48 @@ jobs:
           cp .cargo/ci-config.toml ../.cargo/config.toml
       - name: Install Linux dependencies
         run: ./script/linux
+      - uses: actions/setup-node@v5
+        with:
+          node-version: "24"
       - uses: Swatinem/rust-cache@v2
         with:
           shared-key: linux
           cache-targets: false
       - uses: taiki-e/install-action@nextest
-      # The whole suite needs far more disk and time than a hosted runner has. These crates cover
-      # the core data structures and the code that must not contact Zed-operated services. The
-      # excluded test compiles an extension to WebAssembly, which needs the WASI SDK.
+      # The excluded test compiles an extension to WebAssembly, which needs the WASI SDK.
       - name: Run tests
         run: >
-          cargo nextest run --no-fail-fast
-          --package text --package rope --package sum_tree --package clock --package collections
-          --package util --package paths --package release_channel --package http_client
-          --package settings --package fuzzy --package client --package crashes
-          --package context_server --package extension_host
+          cargo nextest run --no-fail-fast --no-tests=warn
+          ${{ matrix.shard.packages }}
           -E 'not test(test_extension_store_with_test_extension)'
+      - name: Show disk usage
+        if: always()
+        run: df -h / && du -sh target || true
+
+  tests_other_platforms:
+    name: Tests (${{ matrix.platform.name }}, core)
+    runs-on: ${{ matrix.platform.runner }}
+    timeout-minutes: 150
+    strategy:
+      fail-fast: false
+      matrix:
+        platform:
+          - name: macOS
+            runner: macos-latest
+          - name: Windows
+            runner: windows-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: tests-${{ matrix.platform.name }}
+          cache-targets: false
+      - uses: taiki-e/install-action@nextest
+      # The two grandchild tests give PowerShell five seconds to start, which a cold hosted
+      # Windows runner does not always manage.
+      - name: Run tests
+        shell: bash
+        run: >
+          cargo nextest run --no-fail-fast
+          --package text --package rope --package sum_tree --package clock --package collections --package util --package paths --package release_channel --package http_client --package settings --package fuzzy --package client --package crashes --package context_server --package extension_host
+          -E 'not (test(test_extension_store_with_test_extension) or test(terminates_grandchildren))'

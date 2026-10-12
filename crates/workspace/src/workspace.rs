@@ -44,7 +44,7 @@ pub use toast_layer::{ToastAction, ToastLayer, ToastView};
 use agent_settings::AgentSettings;
 use anyhow::{Context as _, Result, anyhow};
 use client::{
-    Client, ErrorExt, TypedEnvelope, UserStore,
+    Client, ErrorExt,
     proto::{self, ErrorCode, PanelId, PeerId},
 };
 use collections::{HashMap, HashSet, TypeIdHashMap, hash_map};
@@ -55,7 +55,7 @@ use futures::{
         mpsc::{self, UnboundedReceiver, UnboundedSender},
         oneshot,
     },
-    future::{Shared, try_join_all},
+    future::Shared,
 };
 use gpui::{
     Action, AnyEntity, AnyView, AnyWeakView, App, AppContext, AsyncApp, AsyncWindowContext, Axis,
@@ -1175,13 +1175,6 @@ pub fn register_project_item<I: ProjectItem>(cx: &mut App) {
 pub struct FollowableViewRegistry(TypeIdHashMap<FollowableViewDescriptor>);
 
 struct FollowableViewDescriptor {
-    from_state_proto: fn(
-        Entity<Workspace>,
-        ViewId,
-        &mut Option<proto::view::Variant>,
-        &mut Window,
-        &mut App,
-    ) -> Option<Task<Result<Box<dyn FollowableItemHandle>>>>,
     to_followable_view: fn(&AnyView) -> Box<dyn FollowableItemHandle>,
 }
 
@@ -1192,29 +1185,9 @@ impl FollowableViewRegistry {
         cx.default_global::<Self>().0.insert(
             TypeId::of::<I>(),
             FollowableViewDescriptor {
-                from_state_proto: |workspace, id, state, window, cx| {
-                    I::from_state_proto(workspace, id, state, window, cx).map(|task| {
-                        cx.foreground_executor()
-                            .spawn(async move { Ok(Box::new(task.await?) as Box<_>) })
-                    })
-                },
                 to_followable_view: |view| Box::new(view.clone().downcast::<I>().unwrap()),
             },
         );
-    }
-
-    pub fn from_state_proto(
-        workspace: Entity<Workspace>,
-        view_id: ViewId,
-        mut state: Option<proto::view::Variant>,
-        window: &mut Window,
-        cx: &mut App,
-    ) -> Option<Task<Result<Box<dyn FollowableItemHandle>>>> {
-        cx.update_default_global(|this: &mut Self, cx| {
-            this.0.values().find_map(|descriptor| {
-                (descriptor.from_state_proto)(workspace.clone(), view_id, &mut state, window, cx)
-            })
-        })
     }
 
     pub fn to_followable_view(
@@ -1328,7 +1301,6 @@ pub fn register_serializable_item<I: SerializableItem>(cx: &mut App) {
 pub struct AppState {
     pub languages: Arc<LanguageRegistry>,
     pub client: Arc<Client>,
-    pub user_store: Entity<UserStore>,
     pub workspace_store: Entity<WorkspaceStore>,
     pub fs: Arc<dyn fs::Fs>,
     pub build_window_options: fn(Option<Uuid>, &mut App) -> WindowOptions,
@@ -1357,9 +1329,9 @@ pub struct PreviousWorkspaceState {
     pub focused_dock: Option<DockPosition>,
 }
 
+#[derive(Default)]
 pub struct WorkspaceStore {
     workspaces: HashSet<(gpui::AnyWindowHandle, WeakEntity<Workspace>)>,
-    _subscriptions: Vec<client::Subscription>,
 }
 
 #[derive(Copy, Clone, Debug, Hash, Eq, PartialEq, PartialOrd, Ord)]
@@ -1378,12 +1350,6 @@ impl From<&PeerId> for CollaboratorId {
     fn from(peer_id: &PeerId) -> Self {
         CollaboratorId::PeerId(*peer_id)
     }
-}
-
-#[derive(PartialEq, Eq, PartialOrd, Ord, Debug)]
-struct Follower {
-    project_id: Option<u64>,
-    peer_id: PeerId,
 }
 
 impl AppState {
@@ -1418,8 +1384,7 @@ impl AppState {
         let http_client = http_client::FakeHttpClient::with_404_response();
         let client = Client::new(clock, http_client, cx);
         let session = cx.new(|cx| AppSession::new(Session::test(), cx));
-        let user_store = cx.new(|cx| UserStore::new(client.clone(), cx));
-        let workspace_store = cx.new(|cx| WorkspaceStore::new(client.clone(), cx));
+        let workspace_store = cx.new(|_| WorkspaceStore::default());
 
         theme_settings::init(theme::LoadThemes::JustBase, cx);
 
@@ -1427,7 +1392,6 @@ impl AppState {
             client,
             fs,
             languages,
-            user_store,
             workspace_store,
             node_runtime: NodeRuntime::unavailable(),
             build_window_options: |_, _| Default::default(),
@@ -1586,7 +1550,6 @@ pub struct Workspace {
     panes_by_item: HashMap<EntityId, WeakEntity<Pane>>,
     active_pane: Entity<Pane>,
     last_active_center_pane: Option<WeakEntity<Pane>>,
-    last_active_view_id: Option<proto::ViewId>,
     status_bar: Entity<StatusBar>,
     pub(crate) modal_layer: Entity<ModalLayer>,
     toast_layer: Entity<ToastLayer>,
@@ -1605,12 +1568,10 @@ pub struct Workspace {
     /// change.
     last_window_title_settings: Option<(String, String)>,
     dirty_items: HashMap<EntityId, Subscription>,
-    leader_updates_tx: mpsc::UnboundedSender<(PeerId, proto::UpdateFollowers)>,
     database_id: Option<WorkspaceId>,
     app_state: Arc<AppState>,
     dispatching_keystrokes: Rc<RefCell<DispatchingKeystrokes>>,
     _subscriptions: Vec<Subscription>,
-    _apply_leader_updates: Task<Result<()>>,
     _schedule_serialize_workspace: Option<Task<()>>,
     _serialize_workspace_task: Option<Task<()>>,
     _schedule_serialize_ssh_paths: Option<Task<()>>,
@@ -1725,14 +1686,6 @@ impl Workspace {
 
         cx.subscribe_in(&project, window, move |this, _, event, window, cx| {
             match event {
-                project::Event::RemoteIdChanged(_) => {
-                    this.update_window_title(window, cx);
-                }
-
-                project::Event::CollaboratorLeft(peer_id) => {
-                    this.collaborator_left(*peer_id, window, cx);
-                }
-
                 &project::Event::WorktreeRemoved(_) => {
                     this.update_window_title(window, cx);
                     this.serialize_workspace(window, cx);
@@ -1763,15 +1716,6 @@ impl Workspace {
                 } => {
                     if this.rename_persisted_navigation_history_paths(old_abs_path, new_abs_path) {
                         this.serialize_workspace(window, cx);
-                    }
-                }
-
-                project::Event::DisconnectedFromHost => {
-                    this.update_window_edited(window, cx);
-                    let leaders_to_unfollow =
-                        this.follower_states.keys().copied().collect::<Vec<_>>();
-                    for leader_id in leaders_to_unfollow {
-                        this.unfollow(leader_id, window, cx);
                     }
                 }
 
@@ -1906,20 +1850,6 @@ impl Workspace {
                 .insert((any_window_handle, weak_handle.clone()));
         });
 
-        // All leader updates are enqueued and then processed in a single task, so
-        // that each asynchronous operation can be run in order.
-        let (leader_updates_tx, mut leader_updates_rx) =
-            mpsc::unbounded::<(PeerId, proto::UpdateFollowers)>();
-        let _apply_leader_updates = cx.spawn_in(window, async move |this, cx| {
-            while let Some((leader_id, update)) = leader_updates_rx.next().await {
-                Self::process_leader_update(&this, leader_id, update, cx)
-                    .await
-                    .log_err();
-            }
-
-            Ok(())
-        });
-
         cx.emit(Event::WorkspaceCreated(weak_handle.clone()));
         let modal_layer = cx.new(|_| ModalLayer::new());
         let toast_layer = cx.new(|_| ToastLayer::new());
@@ -2050,7 +1980,6 @@ impl Workspace {
             panes_by_item: Default::default(),
             active_pane: center_pane.clone(),
             last_active_center_pane: Some(center_pane.downgrade()),
-            last_active_view_id: None,
             status_bar,
             modal_layer,
             toast_layer,
@@ -2073,11 +2002,9 @@ impl Workspace {
             dirty_items: Default::default(),
             database_id: workspace_id,
             app_state,
-            _apply_leader_updates,
             _schedule_serialize_workspace: None,
             _serialize_workspace_task: None,
             _schedule_serialize_ssh_paths: None,
-            leader_updates_tx,
             _subscriptions: subscriptions,
             pane_history_timestamp,
             workspace_actions: Default::default(),
@@ -2121,7 +2048,6 @@ impl Workspace {
         let project_handle = Project::local(
             app_state.client.clone(),
             app_state.node_runtime.clone(),
-            app_state.user_store.clone(),
             app_state.languages.clone(),
             app_state.fs.clone(),
             env,
@@ -3364,8 +3290,7 @@ impl Workspace {
         window: &mut Window,
         cx: &mut Context<Self>,
     ) -> oneshot::Receiver<Option<Vec<PathBuf>>> {
-        if self.project.read(cx).is_via_collab()
-            || self.project.read(cx).is_via_remote_server()
+        if self.project.read(cx).is_via_remote_server()
             || !WorkspaceSettings::get_global(cx).use_system_path_prompts
         {
             let prompt = self.on_prompt_for_new_path.take().unwrap();
@@ -3860,11 +3785,10 @@ impl Workspace {
         cx: &mut Context<Self>,
     ) -> Task<Result<Entity<Workspace>>> {
         let requesting_window = window.window_handle().downcast::<MultiWorkspace>();
-        let is_remote = self.project.read(cx).is_via_collab();
         let has_worktree = self.project.read(cx).worktrees(cx).next().is_some();
         let has_dirty_items = self.items(cx).any(|item| item.is_dirty(cx));
 
-        let workspace_is_empty = !is_remote && !has_worktree && !has_dirty_items;
+        let workspace_is_empty = !has_worktree && !has_dirty_items;
         if workspace_is_empty {
             open_mode = OpenMode::Activate;
         }
@@ -4117,11 +4041,6 @@ impl Workspace {
         window: &mut Window,
         cx: &mut Context<Self>,
     ) {
-        let project = self.project.read(cx);
-        if project.is_via_collab() {
-            self.show_error("You cannot add folders to someone else's project", cx);
-            return;
-        }
         let paths = self.prompt_for_open_path(
             PathPromptOptions {
                 files: false,
@@ -5828,7 +5747,6 @@ impl Workspace {
         }
         self.zoomed_position = None;
         cx.emit(Event::ZoomChanged);
-        self.update_active_view_for_followers(window, cx);
         pane.update(cx, |pane, _| {
             pane.track_alternate_file_items();
         });
@@ -5849,7 +5767,6 @@ impl Workspace {
 
     fn handle_panel_focused(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         self.flush_deferred_saves(window, cx);
-        self.update_active_view_for_followers(window, cx);
     }
 
     fn flush_deferred_saves(&mut self, window: &mut Window, cx: &mut Context<Self>) {
@@ -5921,7 +5838,6 @@ impl Workspace {
                 serialize_workspace = *focus_changed || pane != self.active_pane();
                 if pane == self.active_pane() {
                     self.active_item_path_changed(*focus_changed, window, cx);
-                    self.update_active_view_for_followers(window, cx);
                 } else if *local {
                     self.set_active_pane(pane, window, cx);
                 }
@@ -6180,20 +6096,6 @@ impl Workspace {
             .cloned()
     }
 
-    fn collaborator_left(&mut self, peer_id: PeerId, window: &mut Window, cx: &mut Context<Self>) {
-        self.follower_states.retain(|leader_id, state| {
-            if *leader_id == CollaboratorId::PeerId(peer_id) {
-                for item in state.items_by_leader_view_id.values() {
-                    item.view.set_leader_id(None, window, cx);
-                }
-                false
-            } else {
-                true
-            }
-        });
-        cx.notify();
-    }
-
     pub fn start_following(
         &mut self,
         leader_id: impl Into<CollaboratorId>,
@@ -6233,38 +6135,17 @@ impl Workspace {
         window: &mut Window,
         cx: &mut Context<Self>,
     ) {
-        let collaborators = self.project.read(cx).collaborators();
-        let next_leader_id = if let Some(leader_id) = self.leader_for_pane(&self.active_pane) {
-            let mut collaborators = collaborators.keys().copied();
-            for peer_id in collaborators.by_ref() {
-                if CollaboratorId::PeerId(peer_id) == leader_id {
-                    break;
-                }
-            }
-            collaborators.next().map(CollaboratorId::PeerId)
-        } else if let Some(last_leader_id) =
-            self.last_leaders_by_pane.get(&self.active_pane.downgrade())
-        {
-            match last_leader_id {
-                CollaboratorId::PeerId(peer_id) => {
-                    if collaborators.contains_key(peer_id) {
-                        Some(*last_leader_id)
-                    } else {
-                        None
-                    }
-                }
-                CollaboratorId::Agent => Some(CollaboratorId::Agent),
-            }
-        } else {
+        let next_leader_id = if self.leader_for_pane(&self.active_pane).is_some() {
             None
+        } else {
+            self.last_leaders_by_pane
+                .get(&self.active_pane.downgrade())
+                .copied()
+                .filter(|last_leader_id| matches!(last_leader_id, CollaboratorId::Agent))
         };
 
         let pane = self.active_pane.clone();
-        let Some(leader_id) = next_leader_id.or_else(|| {
-            Some(CollaboratorId::PeerId(
-                collaborators.keys().copied().next()?,
-            ))
-        }) else {
+        let Some(leader_id) = next_leader_id else {
             return;
         };
         if self.unfollow_in_pane(&pane, window, cx) == Some(leader_id) {
@@ -6423,12 +6304,6 @@ impl Workspace {
             let context =
                 Self::window_title_context(&project, active_project_path.as_ref(), &needs, cx);
             title = render_window_title_format(default_template, separator, &context);
-        }
-
-        if project.is_via_collab() {
-            title.push_str(" ↙");
-        } else if project.is_shared() {
-            title.push_str(" ↗");
         }
 
         let document_path = active_project_path
@@ -6638,229 +6513,6 @@ impl Workspace {
 
     // RPC handlers
 
-    fn active_view_for_follower(
-        &self,
-        follower_project_id: Option<u64>,
-        window: &mut Window,
-        cx: &mut Context<Self>,
-    ) -> Option<proto::View> {
-        let (item, panel_id) = self.active_item_for_followers(window, cx);
-        let item = item?;
-        let leader_id = self
-            .pane_for(&*item)
-            .and_then(|pane| self.leader_for_pane(&pane));
-        let leader_peer_id = match leader_id {
-            Some(CollaboratorId::PeerId(peer_id)) => Some(peer_id),
-            Some(CollaboratorId::Agent) | None => None,
-        };
-
-        let item_handle = item.to_followable_item_handle(cx)?;
-        let id = item_handle.remote_id(window, cx)?;
-        let variant = item_handle.to_state_proto(window, cx)?;
-
-        if item_handle.is_project_item(window, cx)
-            && (follower_project_id.is_none()
-                || follower_project_id != self.project.read(cx).remote_id())
-        {
-            return None;
-        }
-
-        Some(proto::View {
-            id: id.to_proto(),
-            leader_id: leader_peer_id,
-            variant: Some(variant),
-            panel_id: panel_id.map(|id| id as i32),
-        })
-    }
-
-    fn handle_follow(
-        &mut self,
-        follower_project_id: Option<u64>,
-        window: &mut Window,
-        cx: &mut Context<Self>,
-    ) -> proto::FollowResponse {
-        let active_view = self.active_view_for_follower(follower_project_id, window, cx);
-
-        cx.notify();
-        proto::FollowResponse {
-            views: active_view.iter().cloned().collect(),
-            active_view,
-        }
-    }
-
-    fn handle_update_followers(
-        &mut self,
-        leader_id: PeerId,
-        message: proto::UpdateFollowers,
-        _window: &mut Window,
-        _cx: &mut Context<Self>,
-    ) {
-        self.leader_updates_tx
-            .unbounded_send((leader_id, message))
-            .ok();
-    }
-
-    async fn process_leader_update(
-        this: &WeakEntity<Self>,
-        leader_id: PeerId,
-        update: proto::UpdateFollowers,
-        cx: &mut AsyncWindowContext,
-    ) -> Result<()> {
-        match update.variant.context("invalid update")? {
-            proto::update_followers::Variant::CreateView(view) => {
-                let view_id = ViewId::from_proto(view.id.context("invalid view id")?)?;
-                let should_add_view = this.update(cx, |this, _| {
-                    if let Some(state) = this.follower_states.get_mut(&leader_id.into()) {
-                        anyhow::Ok(!state.items_by_leader_view_id.contains_key(&view_id))
-                    } else {
-                        anyhow::Ok(false)
-                    }
-                })??;
-
-                if should_add_view {
-                    Self::add_view_from_leader(this.clone(), leader_id, &view, cx).await?
-                }
-            }
-            proto::update_followers::Variant::UpdateActiveView(update_active_view) => {
-                let should_add_view = this.update(cx, |this, _| {
-                    if let Some(state) = this.follower_states.get_mut(&leader_id.into()) {
-                        state.active_view_id = update_active_view
-                            .view
-                            .as_ref()
-                            .and_then(|view| ViewId::from_proto(view.id?).ok());
-
-                        if state.active_view_id.is_some_and(|view_id| {
-                            !state.items_by_leader_view_id.contains_key(&view_id)
-                        }) {
-                            anyhow::Ok(true)
-                        } else {
-                            anyhow::Ok(false)
-                        }
-                    } else {
-                        anyhow::Ok(false)
-                    }
-                })??;
-
-                if should_add_view && let Some(view) = update_active_view.view {
-                    Self::add_view_from_leader(this.clone(), leader_id, &view, cx).await?
-                }
-            }
-            proto::update_followers::Variant::UpdateView(update_view) => {
-                let variant = update_view.variant.context("missing update view variant")?;
-                let id = update_view.id.context("missing update view id")?;
-                let mut tasks = Vec::new();
-                this.update_in(cx, |this, window, cx| {
-                    let project = this.project.clone();
-                    if let Some(state) = this.follower_states.get(&leader_id.into()) {
-                        let view_id = ViewId::from_proto(id)?;
-                        if let Some(item) = state.items_by_leader_view_id.get(&view_id) {
-                            tasks.push(item.view.apply_update_proto(
-                                &project,
-                                variant.clone(),
-                                window,
-                                cx,
-                            ));
-                        }
-                    }
-                    anyhow::Ok(())
-                })??;
-                try_join_all(tasks).await.log_err();
-            }
-        }
-        this.update_in(cx, |this, window, cx| {
-            this.leader_updated(leader_id, window, cx)
-        })?;
-        Ok(())
-    }
-
-    async fn add_view_from_leader(
-        this: WeakEntity<Self>,
-        leader_id: PeerId,
-        view: &proto::View,
-        cx: &mut AsyncWindowContext,
-    ) -> Result<()> {
-        let this = this.upgrade().context("workspace dropped")?;
-
-        let Some(id) = view.id else {
-            anyhow::bail!("no id for view");
-        };
-        let id = ViewId::from_proto(id)?;
-        let pane = this.update(cx, |this, _cx| {
-            let state = this
-                .follower_states
-                .get(&leader_id.into())
-                .context("stopped following")?;
-            anyhow::Ok(state.pane().clone())
-        })?;
-        let existing_item = pane.update_in(cx, |pane, window, cx| {
-            pane.items().find_map(|item| {
-                let item = item.to_followable_item_handle(cx)?;
-                if item.remote_id(window, cx) == Some(id) {
-                    Some(item)
-                } else {
-                    None
-                }
-            })
-        })?;
-        let item = if let Some(existing_item) = existing_item {
-            existing_item
-        } else {
-            let variant = view.variant.clone();
-            anyhow::ensure!(variant.is_some(), "missing view variant");
-
-            let task = cx.update(|window, cx| {
-                FollowableViewRegistry::from_state_proto(this.clone(), id, variant, window, cx)
-            })?;
-
-            let Some(task) = task else {
-                anyhow::bail!(
-                    "failed to construct view from leader (maybe from a different version of zed?)"
-                );
-            };
-
-            let mut new_item = task.await?;
-            pane.update_in(cx, |pane, window, cx| {
-                let mut item_to_remove = None;
-                for (ix, item) in pane.items().enumerate() {
-                    if let Some(item) = item.to_followable_item_handle(cx) {
-                        match new_item.dedup(item.as_ref(), window, cx) {
-                            Some(item::Dedup::KeepExisting) => {
-                                new_item =
-                                    item.boxed_clone().to_followable_item_handle(cx).unwrap();
-                                break;
-                            }
-                            Some(item::Dedup::ReplaceExisting) => {
-                                item_to_remove = Some((ix, item.item_id()));
-                                break;
-                            }
-                            None => {}
-                        }
-                    }
-                }
-
-                if let Some((ix, id)) = item_to_remove {
-                    pane.remove_item(id, false, false, window, cx);
-                    pane.add_item(new_item.boxed_clone(), false, false, Some(ix), window, cx);
-                }
-            })?;
-
-            new_item
-        };
-
-        this.update_in(cx, |this, window, cx| {
-            let state = this.follower_states.get_mut(&leader_id.into())?;
-            item.set_leader_id(Some(leader_id.into()), window, cx);
-            state
-                .items_by_leader_view_id
-                .insert(id, FollowerView { view: item });
-
-            Some(())
-        })
-        .context("no follower state")?;
-
-        Ok(())
-    }
-
     fn handle_agent_location_changed(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         let Some(follower_state) = self.follower_states.get_mut(&CollaboratorId::Agent) else {
             return;
@@ -6917,102 +6569,6 @@ impl Workspace {
         }
 
         self.leader_updated(CollaboratorId::Agent, window, cx);
-    }
-
-    pub fn update_active_view_for_followers(&mut self, window: &mut Window, cx: &mut App) {
-        let mut is_project_item = true;
-        let mut update = proto::UpdateActiveView::default();
-        if window.is_window_active() {
-            let (active_item, panel_id) = self.active_item_for_followers(window, cx);
-
-            if let Some(item) = active_item
-                && item.item_focus_handle(cx).contains_focused(window, cx)
-            {
-                let leader_id = self
-                    .pane_for(&*item)
-                    .and_then(|pane| self.leader_for_pane(&pane));
-                let leader_peer_id = match leader_id {
-                    Some(CollaboratorId::PeerId(peer_id)) => Some(peer_id),
-                    Some(CollaboratorId::Agent) | None => None,
-                };
-
-                if let Some(item) = item.to_followable_item_handle(cx) {
-                    let id = item.remote_id(window, cx).map(|id| id.to_proto());
-
-                    if let Some(id) = id
-                        && let Some(variant) = item.to_state_proto(window, cx)
-                    {
-                        let view = Some(proto::View {
-                            id,
-                            leader_id: leader_peer_id,
-                            variant: Some(variant),
-                            panel_id: panel_id.map(|id| id as i32),
-                        });
-
-                        is_project_item = item.is_project_item(window, cx);
-                        update = proto::UpdateActiveView { view };
-                    };
-                }
-            }
-        }
-
-        let active_view_id = update.view.as_ref().and_then(|view| view.id.as_ref());
-        if active_view_id != self.last_active_view_id.as_ref() {
-            self.last_active_view_id = active_view_id.cloned();
-            self.update_followers(
-                is_project_item,
-                proto::update_followers::Variant::UpdateActiveView(update),
-                window,
-                cx,
-            );
-        }
-    }
-
-    fn active_item_for_followers(
-        &self,
-        window: &mut Window,
-        cx: &mut App,
-    ) -> (Option<Box<dyn ItemHandle>>, Option<proto::PanelId>) {
-        let mut active_item = None;
-        let mut panel_id = None;
-        for dock in self.all_docks() {
-            if dock.focus_handle(cx).contains_focused(window, cx)
-                && let Some(panel) = dock.read(cx).active_panel()
-                && let Some(pane) = panel.pane(cx)
-                && let Some(item) = pane.read(cx).active_item()
-            {
-                active_item = Some(item);
-                panel_id = panel.remote_id();
-                break;
-            }
-        }
-
-        if active_item.is_none() {
-            active_item = self.active_pane().read(cx).active_item();
-        }
-        (active_item, panel_id)
-    }
-
-    fn update_followers(
-        &self,
-        project_only: bool,
-        update: proto::update_followers::Variant,
-        _: &mut Window,
-        cx: &mut App,
-    ) -> Option<()> {
-        // If this update only applies to for followers in the current project,
-        // then skip it unless this project is shared. If it applies to all
-        // followers, regardless of project, then set `project_id` to none,
-        // indicating that it goes to all followers.
-        let _project_id = if project_only {
-            Some(self.project.read(cx).remote_id()?)
-        } else {
-            None
-        };
-        // Follower updates are addressed to a call room. Nothing provides one
-        // since calls were removed, so there is nowhere to send `update`.
-        drop(update);
-        None
     }
 
     pub fn leader_for_pane(&self, pane: &Entity<Pane>) -> Option<CollaboratorId> {
@@ -8065,15 +7621,13 @@ impl Workspace {
         use session::Session;
 
         let client = project.read(cx).client();
-        let user_store = project.read(cx).user_store();
-        let workspace_store = cx.new(|cx| WorkspaceStore::new(client.clone(), cx));
+        let workspace_store = cx.new(|_| WorkspaceStore::default());
         let session = cx.new(|cx| AppSession::new(Session::test(), cx));
         window.activate_window();
         let app_state = Arc::new(AppState {
             languages: project.read(cx).languages().clone(),
             workspace_store,
             client,
-            user_store,
             fs: project.read(cx).fs().clone(),
             build_window_options: |_, _| Default::default(),
             node_runtime: NodeRuntime::unavailable(),
@@ -9555,86 +9109,6 @@ impl Render for Workspace {
 }
 
 impl WorkspaceStore {
-    pub fn new(client: Arc<Client>, cx: &mut Context<Self>) -> Self {
-        Self {
-            workspaces: Default::default(),
-            _subscriptions: vec![
-                client.add_request_handler(cx.weak_entity(), Self::handle_follow),
-                client.add_message_handler(cx.weak_entity(), Self::handle_update_followers),
-            ],
-        }
-    }
-
-    pub async fn handle_follow(
-        this: Entity<Self>,
-        envelope: TypedEnvelope<proto::Follow>,
-        mut cx: AsyncApp,
-    ) -> Result<proto::FollowResponse> {
-        this.update(&mut cx, |this, cx| {
-            let follower = Follower {
-                project_id: envelope.payload.project_id,
-                peer_id: envelope.original_sender_id()?,
-            };
-
-            let mut response = proto::FollowResponse::default();
-
-            this.workspaces.retain(|(window_handle, weak_workspace)| {
-                let Some(workspace) = weak_workspace.upgrade() else {
-                    return false;
-                };
-                window_handle
-                    .update(cx, |_, window, cx| {
-                        workspace.update(cx, |workspace, cx| {
-                            let handler_response =
-                                workspace.handle_follow(follower.project_id, window, cx);
-                            if let Some(active_view) = handler_response.active_view
-                                && workspace.project.read(cx).remote_id() == follower.project_id
-                            {
-                                response.active_view = Some(active_view)
-                            }
-                        });
-                    })
-                    .is_ok()
-            });
-
-            Ok(response)
-        })
-    }
-
-    async fn handle_update_followers(
-        this: Entity<Self>,
-        envelope: TypedEnvelope<proto::UpdateFollowers>,
-        mut cx: AsyncApp,
-    ) -> Result<()> {
-        let leader_id = envelope.original_sender_id()?;
-        let update = envelope.payload;
-
-        this.update(&mut cx, |this, cx| {
-            this.workspaces.retain(|(window_handle, weak_workspace)| {
-                let Some(workspace) = weak_workspace.upgrade() else {
-                    return false;
-                };
-                window_handle
-                    .update(cx, |_, window, cx| {
-                        workspace.update(cx, |workspace, cx| {
-                            let project_id = workspace.project.read(cx).remote_id();
-                            if update.project_id != project_id && update.project_id.is_some() {
-                                return;
-                            }
-                            workspace.handle_update_followers(
-                                leader_id,
-                                update.clone(),
-                                window,
-                                cx,
-                            );
-                        });
-                    })
-                    .is_ok()
-            });
-            Ok(())
-        })
-    }
-
     pub fn workspaces(&self) -> impl Iterator<Item = &WeakEntity<Workspace>> {
         self.workspaces.iter().map(|(_, weak)| weak)
     }
@@ -9643,29 +9117,6 @@ impl WorkspaceStore {
         &self,
     ) -> impl Iterator<Item = (gpui::AnyWindowHandle, &WeakEntity<Workspace>)> {
         self.workspaces.iter().map(|(window, weak)| (*window, weak))
-    }
-}
-
-impl ViewId {
-    pub(crate) fn from_proto(message: proto::ViewId) -> Result<Self> {
-        Ok(Self {
-            creator: message
-                .creator
-                .map(CollaboratorId::PeerId)
-                .context("creator is missing")?,
-            id: message.id,
-        })
-    }
-
-    pub(crate) fn to_proto(self) -> Option<proto::ViewId> {
-        if let CollaboratorId::PeerId(peer_id) = self.creator {
-            Some(proto::ViewId {
-                creator: Some(peer_id),
-                id: self.id,
-            })
-        } else {
-            None
-        }
     }
 }
 
@@ -9904,8 +9355,6 @@ fn restore_native_window_state(
         })
         .log_err();
 }
-
-actions!(collab, []);
 
 actions!(
     zed,
@@ -10231,7 +9680,6 @@ pub fn open_workspace_by_id(
     let project_handle = Project::local(
         app_state.client.clone(),
         app_state.node_runtime.clone(),
-        app_state.user_store.clone(),
         app_state.languages.clone(),
         app_state.fs.clone(),
         None,
@@ -10654,7 +10102,6 @@ pub fn open_remote_project_with_new_connection(
                 session,
                 app_state.client.clone(),
                 app_state.node_runtime.clone(),
-                app_state.user_store.clone(),
                 app_state.languages.clone(),
                 app_state.fs.clone(),
                 true,
@@ -12185,36 +11632,6 @@ mod tests {
         fs.set_branch_name(Path::new(path!("/root1/.git")), Some("other"));
         cx.executor().run_until_parked();
         assert_eq!(cx.window_title().as_deref(), Some("root1 — a.txt"));
-    }
-
-    #[gpui::test]
-    async fn test_window_title_collab_indicator_remains_appended(cx: &mut TestAppContext) {
-        init_test(cx);
-
-        let fs = FakeFs::new(cx.executor());
-        let project = Project::test(fs, ["root1".as_ref()], cx).await;
-        project.update(cx, |project, _| project.mark_as_collab_for_testing());
-        let (workspace, cx) =
-            cx.add_window_view(|window, cx| Workspace::test_new(project.clone(), window, cx));
-
-        let item = cx.new(|cx| {
-            TestItem::new(cx).with_project_items(&[TestProjectItem::new(1, "src/one.txt", cx)])
-        });
-
-        workspace.update_in(cx, |workspace, window, cx| {
-            workspace.add_item_to_active_pane(Box::new(item), None, true, window, cx)
-        });
-
-        cx.update(|_, cx| {
-            SettingsStore::update_global(cx, |settings, cx| {
-                settings.update_user_settings(cx, |settings| {
-                    settings.workspace.window_title_format =
-                        Some("${projectName}${separator}${fileName}".to_string());
-                })
-            });
-        });
-        cx.executor().run_until_parked();
-        assert_eq!(cx.window_title().as_deref(), Some("root1 — one.txt ↙"));
     }
 
     #[gpui::test]
@@ -17932,15 +17349,40 @@ mod tests {
         }
 
         #[gpui::test]
-        async fn test_open_url_or_file_resolves_remote_base_path(cx: &mut TestAppContext) {
+        async fn test_open_url_or_file_resolves_remote_base_path(
+            cx: &mut TestAppContext,
+            server_cx: &mut TestAppContext,
+        ) {
             init_test(cx);
             cx.update(register_project_item::<TestPngItemView>);
+            cx.update(|cx| release_channel::init("0.0.0".parse().expect("valid version"), cx));
 
-            let project = Project::test(FakeFs::new(cx.executor()), [], cx).await;
+            let fs = FakeFs::new(cx.executor());
+            let local_project = Project::test(fs.clone(), [], cx).await;
+            let (connection_options, server_session, connect_guard) =
+                remote::RemoteClient::fake_server(cx, server_cx);
+            let server_entity = server_cx.new(|_| ());
+            server_session.add_request_handler(
+                server_entity.downgrade(),
+                |_: Entity<()>, _: client::TypedEnvelope<client::proto::Ping>, _| async {
+                    Ok(client::proto::Ack {})
+                },
+            );
+            drop(connect_guard);
+            let remote_client = remote::RemoteClient::connect_mock(connection_options, cx).await;
+            let project = cx.update(|cx| {
+                Project::remote(
+                    remote_client,
+                    local_project.read(cx).client(),
+                    node_runtime::NodeRuntime::unavailable(),
+                    local_project.read(cx).languages().clone(),
+                    fs,
+                    false,
+                    cx,
+                )
+            });
             let worktree = project.update(cx, |project, cx| {
-                let worktree = project.add_test_remote_worktree("/remote/project", cx);
-                project.mark_as_collab_for_testing();
-                worktree
+                project.add_test_remote_worktree("/remote/project", cx)
             });
             let worktree_id = worktree.read_with(cx, |worktree, _| worktree.id());
             let (workspace, cx) =

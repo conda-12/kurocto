@@ -1,0 +1,112 @@
+name: Release build
+
+# Builds the distributable for each platform and uploads it as a workflow artifact. Nothing is
+# published: there is no signing, notarization or release upload yet.
+on:
+  workflow_dispatch:
+  push:
+    tags: ["v*"]
+    # Push to a branch under release-test/ to exercise the packaging scripts without tagging.
+    branches: ["release-test/**"]
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: always
+  CARGO_INCREMENTAL: 0
+  RUST_BACKTRACE: 1
+
+jobs:
+  macos:
+    name: macOS (Apple silicon)
+    runs-on: macos-latest
+    timeout-minutes: 240
+    steps:
+      - uses: actions/checkout@v5
+      - uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: release-macos
+          cache-targets: false
+      - name: Build the app bundle and DMG
+        run: ./script/bundle-mac
+      - name: Check the bundle's identity, licenses and endpoints
+        run: |
+          app_path="$(ls -d target/*/release/dmg/*.app)"
+          dmg_path="$(ls target/*/release/Kurocto-*.dmg)"
+          ./script/check-bundle-identity "$app_path" "$dmg_path"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: kurocto-macos-aarch64
+          if-no-files-found: error
+          path: |
+            target/*/release/Kurocto-*.dmg
+            target/kurocto-remote-server-macos-*.gz
+
+  linux:
+    name: Linux (x86_64)
+    # The oldest hosted image, so the binary links against an old glibc.
+    runs-on: ubuntu-22.04
+    timeout-minutes: 240
+    steps:
+      - uses: actions/checkout@v5
+      - name: Free disk space
+        run: ./script/ci-free-disk-space
+      - name: Install Linux dependencies
+        run: ./script/linux
+      - uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: release-linux
+          cache-targets: false
+      - name: Build the tarball
+        run: ./script/bundle-linux
+      - name: Check the tarball's licenses
+        run: |
+          tarball="$(ls target/release/kurocto-linux-*.tar.gz)"
+          listing="$(tar -tzf "$tarball")"
+          for expected in LICENSE-GPL LICENSE-APACHE licenses.md bin/kurocto libexec/kurocto-editor; do
+            if ! grep -q "/$expected\$" <<<"$listing"; then
+              echo "missing from tarball: $expected"
+              exit 1
+            fi
+          done
+      - uses: actions/upload-artifact@v4
+        with:
+          name: kurocto-linux-x86_64
+          if-no-files-found: error
+          path: |
+            target/release/kurocto-linux-*.tar.gz
+            target/kurocto-remote-server-linux-*.gz
+
+  windows:
+    name: Windows (x86_64)
+    runs-on: windows-latest
+    timeout-minutes: 240
+    steps:
+      - uses: actions/checkout@v5
+      - uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: release-windows
+          cache-targets: false
+      - name: Set the release environment
+        shell: pwsh
+        run: |
+          $version = & "script/get-crate-version.ps1" "zed"
+          $channel = Get-Content "crates/zed/RELEASE_CHANNEL"
+          "RELEASE_VERSION=$version" >> $env:GITHUB_ENV
+          "ZED_RELEASE_CHANNEL=$channel" >> $env:GITHUB_ENV
+          "ZED_WORKSPACE=$env:GITHUB_WORKSPACE" >> $env:GITHUB_ENV
+      - name: Build the installer
+        shell: pwsh
+        run: ./script/bundle-windows.ps1
+      - uses: actions/upload-artifact@v4
+        with:
+          name: kurocto-windows-x86_64
+          if-no-files-found: error
+          path: |
+            target/Kurocto-*.exe
+            target/kurocto-remote-server-windows-*.zip

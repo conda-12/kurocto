@@ -377,7 +377,7 @@ impl Editor {
                         return;
                     }
 
-                    let capability = workspace.project().read(cx).capability();
+                    let capability = language::Capability::ReadWrite;
                     let excerpt_buffer =
                         cx.new(|_cx| MultiBuffer::new(capability).with_title("Bookmarks".into()));
                     let bookmarks_tab_state = cx.new(|cx| {

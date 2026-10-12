@@ -1,12 +1,12 @@
 use std::path::PathBuf;
 use std::sync::Arc;
 
-use client::{Client, ProxySettings, UserStore};
+use client::{Client, ProxySettings};
 use db::AppDatabase;
 use extension::ExtensionHostProxy;
 use fs::RealFs;
+use gpui::App;
 use gpui::http_client::read_proxy_from_env;
-use gpui::{App, AppContext as _, Entity};
 use gpui_tokio::Tokio;
 use language::LanguageRegistry;
 use language_extension::LspAccess;
@@ -21,7 +21,6 @@ use util::ResultExt as _;
 pub struct AgentCliAppState {
     pub languages: Arc<LanguageRegistry>,
     pub client: Arc<Client>,
-    pub user_store: Entity<UserStore>,
     pub fs: Arc<dyn fs::Fs>,
     pub node_runtime: NodeRuntime,
 }
@@ -73,8 +72,6 @@ pub fn init(cx: &mut App) -> Arc<AgentCliAppState> {
     let mut languages = LanguageRegistry::new(cx.background_executor().clone());
     languages.set_language_server_download_dir(paths::languages_dir().clone());
     let languages = Arc::new(languages);
-
-    let user_store = cx.new(|cx| UserStore::new(client.clone(), cx));
 
     extension::init(cx);
 
@@ -132,7 +129,6 @@ pub fn init(cx: &mut App) -> Arc<AgentCliAppState> {
     Arc::new(AgentCliAppState {
         languages,
         client,
-        user_store,
         fs,
         node_runtime,
     })
