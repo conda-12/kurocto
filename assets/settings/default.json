@@ -2890,7 +2890,7 @@
   "stable": {
     // "theme": "Andromeda"
   },
-  // Settings overrides to use when using Zed Dev.
+  // Settings overrides to use when using Kurocto Zed.
   // Mostly useful for developers who are managing multiple instances of Zed.
   "dev": {
     // "theme": "Andromeda"
