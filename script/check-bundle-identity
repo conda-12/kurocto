@@ -1,0 +1,151 @@
+#!/usr/bin/env bash
+
+# Inspects a built macOS app bundle (and optionally its DMG) and fails if it
+# still presents itself as Zed, embeds Zed-operated service endpoints or Zed's
+# terms, or is missing the license texts that must accompany the binaries.
+
+set -euo pipefail
+
+if [[ $# -lt 1 || $# -gt 2 ]]; then
+    echo "Usage: ${0##*/} <path to .app> [path to .dmg]" >&2
+    exit 2
+fi
+
+app_path="$1"
+dmg_path="${2:-}"
+failures=0
+
+fail() {
+    echo "FAIL: $1"
+    failures=$((failures + 1))
+}
+
+pass() {
+    echo "ok:   $1"
+}
+
+require_file() {
+    if [[ -s "$1" ]]; then
+        pass "present: ${1#"$app_path"/}"
+    else
+        fail "missing or empty: ${1#"$app_path"/}"
+    fi
+}
+
+plist="$app_path/Contents/Info.plist"
+if [[ ! -f "$plist" ]]; then
+    echo "Not an app bundle: $app_path" >&2
+    exit 2
+fi
+
+plist_value() {
+    /usr/libexec/PlistBuddy -c "Print :$1" "$plist" 2>/dev/null || true
+}
+
+bundle_identifier="$(plist_value CFBundleIdentifier)"
+bundle_name="$(plist_value CFBundleName)"
+executable_name="$(plist_value CFBundleExecutable)"
+
+case "$bundle_identifier" in
+    dev.kurocto.Kurocto*) pass "bundle identifier: $bundle_identifier" ;;
+    *) fail "bundle identifier is not Kurocto's: $bundle_identifier" ;;
+esac
+
+case "$bundle_name" in
+    Kurocto*) pass "bundle name: $bundle_name" ;;
+    *) fail "bundle name is not Kurocto's: $bundle_name" ;;
+esac
+
+if [[ "$executable_name" == "kurocto" && -x "$app_path/Contents/MacOS/kurocto" ]]; then
+    pass "executable: Contents/MacOS/kurocto"
+else
+    fail "executable is not Contents/MacOS/kurocto (CFBundleExecutable=$executable_name)"
+fi
+
+# Info.plist is user-visible through permission prompts and Finder. The only
+# sanctioned mention of Zed there is none at all.
+if plutil -convert xml1 -o - "$plist" | grep -n -i -w "zed" >/dev/null; then
+    fail "Info.plist mentions Zed:"
+    plutil -convert xml1 -o - "$plist" | grep -n -i -w "zed" | sed 's/^/        /' | head -10
+else
+    pass "Info.plist does not mention Zed"
+fi
+
+if [[ -e "$app_path/Contents/embedded.provisionprofile" ]]; then
+    fail "an embedded provisioning profile is present"
+else
+    pass "no embedded provisioning profile"
+fi
+
+if find "$app_path" -iname '*terms*' -o -iname '*privacy*' | grep -q .; then
+    fail "terms or privacy documents are bundled:"
+    find "$app_path" -iname '*terms*' -o -iname '*privacy*' | sed 's/^/        /'
+else
+    pass "no terms or privacy documents bundled"
+fi
+
+resources="$app_path/Contents/Resources"
+require_file "$resources/LICENSE-GPL"
+require_file "$resources/LICENSE-APACHE"
+require_file "$resources/licenses.md"
+if [[ -x "$app_path/Contents/MacOS/git" ]]; then
+    require_file "$resources/LICENSE-GIT"
+fi
+
+if [[ -s "$resources/LICENSE-GPL" ]] && ! grep -q "GNU GENERAL PUBLIC LICENSE" "$resources/LICENSE-GPL"; then
+    fail "LICENSE-GPL does not contain the GPL text"
+fi
+if [[ -s "$resources/licenses.md" ]]; then
+    for expected in "THEME LICENSES" "ICON LICENSES" "FONT LICENSES" "CODE LICENSES" "SIL OPEN FONT LICENSE"; do
+        if grep -q "$expected" "$resources/licenses.md"; then
+            pass "third-party notices include: $expected"
+        else
+            fail "third-party notices are missing: $expected"
+        fi
+    done
+    if grep -q "Zed Industries" "$resources/licenses.md" || grep -q "Zed Industries" "$resources/LICENSE-APACHE"; then
+        pass "upstream copyright notice retained"
+    else
+        fail "upstream copyright notice (Zed Industries) not found in the shipped licenses"
+    fi
+fi
+
+# Hosts of services operated by Zed Industries. None may be compiled in.
+binary="$app_path/Contents/MacOS/kurocto"
+if [[ -f "$binary" ]]; then
+    binary_strings="$(mktemp)"
+    trap 'rm -f "$binary_strings"' EXIT
+    strings -a "$binary" >"$binary_strings"
+    for host in "api.zed.dev" "cloud.zed.dev" "api-staging.zed.dev" "staging.zed.dev" "status.zed.dev" "merch.zed.dev" "zed.dev/oauth" "zed.dev/api/" "telemetry/events" "release_notes/v2" "sentry"; do
+        if grep -q -F "$host" "$binary_strings"; then
+            fail "binary contains \"$host\":"
+            grep -F "$host" "$binary_strings" | cut -c1-160 | sed 's/^/        /' | head -3
+        else
+            pass "binary does not contain \"$host\""
+        fi
+    done
+    if grep -q "View Dependency Licenses" "$binary_strings" && grep -q "modified version of Zed" "$binary_strings"; then
+        pass "binary carries the modified-version notice and license menu entry"
+    else
+        fail "binary is missing the modified-version notice or the license menu entry"
+    fi
+fi
+
+if [[ -n "$dmg_path" ]]; then
+    case "$(basename "$dmg_path")" in
+        Kurocto-*.dmg) pass "DMG name: $(basename "$dmg_path")" ;;
+        *) fail "DMG is not named Kurocto-<arch>.dmg: $(basename "$dmg_path")" ;;
+    esac
+    # A license agreement attached with dmg-license shows up as an LPic resource.
+    if hdiutil udifderez -xml "$dmg_path" 2>/dev/null | grep -q "<key>LPic</key>"; then
+        fail "DMG has an attached license agreement (click-through terms)"
+    else
+        pass "DMG has no attached license agreement"
+    fi
+fi
+
+if [[ $failures -gt 0 ]]; then
+    echo "$failures check(s) failed"
+    exit 1
+fi
+echo "all checks passed"
