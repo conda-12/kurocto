@@ -44,10 +44,10 @@ pub static RELEASE_CHANNEL: LazyLock<ReleaseChannel> =
 #[cfg(target_os = "windows")]
 pub fn app_identifier() -> &'static str {
     match *RELEASE_CHANNEL {
-        ReleaseChannel::Dev => "Zed-Editor-Dev",
-        ReleaseChannel::Nightly => "Zed-Editor-Nightly",
-        ReleaseChannel::Preview => "Zed-Editor-Preview",
-        ReleaseChannel::Stable => "Zed-Editor-Stable",
+        ReleaseChannel::Dev => "Kurocto-Editor-Dev",
+        ReleaseChannel::Nightly => "Kurocto-Editor-Nightly",
+        ReleaseChannel::Preview => "Kurocto-Editor-Preview",
+        ReleaseChannel::Stable => "Kurocto-Editor-Stable",
     }
 }
 
@@ -200,10 +200,10 @@ impl ReleaseChannel {
     /// Returns the display name for this [`ReleaseChannel`].
     pub fn display_name(&self) -> &'static str {
         match self {
-            ReleaseChannel::Dev => "Kurocto Zed",
-            ReleaseChannel::Nightly => "Zed Nightly",
-            ReleaseChannel::Preview => "Zed Preview",
-            ReleaseChannel::Stable => "Zed",
+            ReleaseChannel::Dev => "Kurocto Dev",
+            ReleaseChannel::Nightly => "Kurocto Nightly",
+            ReleaseChannel::Preview => "Kurocto Preview",
+            ReleaseChannel::Stable => "Kurocto",
         }
     }
 
@@ -219,13 +219,13 @@ impl ReleaseChannel {
 
     /// Returns the application ID that's used by Wayland as application ID
     /// and WM_CLASS on X11.
-    /// This also has to match the bundle identifier for Zed on macOS.
+    /// This also has to match the bundle identifier on macOS.
     pub fn app_id(&self) -> &'static str {
         match self {
-            ReleaseChannel::Dev => "dev.zed.Zed-Dev",
-            ReleaseChannel::Nightly => "dev.zed.Zed-Nightly",
-            ReleaseChannel::Preview => "dev.zed.Zed-Preview",
-            ReleaseChannel::Stable => "dev.zed.Zed",
+            ReleaseChannel::Dev => "dev.kurocto.Kurocto-Dev",
+            ReleaseChannel::Nightly => "dev.kurocto.Kurocto-Nightly",
+            ReleaseChannel::Preview => "dev.kurocto.Kurocto-Preview",
+            ReleaseChannel::Stable => "dev.kurocto.Kurocto",
         }
     }
 
@@ -278,6 +278,28 @@ impl FromStr for ReleaseChannel {
 #[cfg(test)]
 mod tests {
     use super::ReleaseChannel;
+
+    #[test]
+    fn test_display_name_for_release_channel() {
+        assert_eq!(ReleaseChannel::Dev.display_name(), "Kurocto Dev");
+        assert_eq!(ReleaseChannel::Nightly.display_name(), "Kurocto Nightly");
+        assert_eq!(ReleaseChannel::Preview.display_name(), "Kurocto Preview");
+        assert_eq!(ReleaseChannel::Stable.display_name(), "Kurocto");
+    }
+
+    #[test]
+    fn test_app_id_for_release_channel() {
+        assert_eq!(ReleaseChannel::Dev.app_id(), "dev.kurocto.Kurocto-Dev");
+        assert_eq!(
+            ReleaseChannel::Nightly.app_id(),
+            "dev.kurocto.Kurocto-Nightly"
+        );
+        assert_eq!(
+            ReleaseChannel::Preview.app_id(),
+            "dev.kurocto.Kurocto-Preview"
+        );
+        assert_eq!(ReleaseChannel::Stable.app_id(), "dev.kurocto.Kurocto");
+    }
 
     #[test]
     fn test_docs_url_for_release_channel() {

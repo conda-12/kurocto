@@ -53,7 +53,7 @@ fn nix_pr_jobs(labels: &[&str]) -> [NamedJob; 2] {
             arch,
             "default",
             // don't push PR builds to the cache
-            Some("-zed-editor-[0-9.]*"),
+            Some("-kurocto-editor-[0-9.]*"),
             &[],
         );
         job.job = job.job.cond(Expression::new(format!(

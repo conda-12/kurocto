@@ -14,6 +14,19 @@ const RECEIVE_TIMEOUT: Duration = Duration::from_millis(35);
 const SEND_TIMEOUT: Duration = Duration::from_millis(20);
 const USER_BLOCK: u16 = 100;
 
+// Deliberately different from the base upstream Zed uses (43737), so that both
+// editors can run side by side for the same user without sharing a port.
+const PORT_BASE: u16 = 47737;
+
+fn channel_port(release_channel: ReleaseChannel) -> u16 {
+    match release_channel {
+        ReleaseChannel::Dev => PORT_BASE,
+        ReleaseChannel::Preview => PORT_BASE + USER_BLOCK,
+        ReleaseChannel::Stable => PORT_BASE + (2 * USER_BLOCK),
+        ReleaseChannel::Nightly => PORT_BASE + (3 * USER_BLOCK),
+    }
+}
+
 fn address() -> SocketAddr {
     // These port numbers are offset by the user ID to avoid conflicts between
     // different users on the same machine. In addition to that the ports for each
@@ -22,17 +35,12 @@ fn address() -> SocketAddr {
     // interleaving the ports between different users and different release channels.
     //
     // On macOS user IDs start at 501 and on Linux they start at 1000. The first user
-    // on a Mac with ID 501 running a dev channel build will use port 44238, and the
-    // second user with ID 502 will use port 44239, and so on. User 501 will use ports
-    // 44338, 44438, and 44538 for the preview, stable, and nightly channels,
-    // respectively. User 502 will use ports 44339, 44439, and 44539 for the preview,
+    // on a Mac with ID 501 running a dev channel build will use port 48238, and the
+    // second user with ID 502 will use port 48239, and so on. User 501 will use ports
+    // 48338, 48438, and 48538 for the preview, stable, and nightly channels,
+    // respectively. User 502 will use ports 48339, 48439, and 48539 for the preview,
     // stable, and nightly channels, respectively.
-    let port = match *release_channel::RELEASE_CHANNEL {
-        ReleaseChannel::Dev => 43737,
-        ReleaseChannel::Preview => 43737 + USER_BLOCK,
-        ReleaseChannel::Stable => 43737 + (2 * USER_BLOCK),
-        ReleaseChannel::Nightly => 43737 + (3 * USER_BLOCK),
-    };
+    let port = channel_port(*release_channel::RELEASE_CHANNEL);
     let uid = getuid().as_raw();
     // Ensure that the user ID is not too large to avoid overflow when
     // calculating the port number. This seems unlikely but it doesn't
@@ -44,13 +52,17 @@ fn address() -> SocketAddr {
     SocketAddr::V4(SocketAddrV4::new(LOCALHOST, user_port))
 }
 
-fn instance_handshake() -> &'static str {
-    match *release_channel::RELEASE_CHANNEL {
-        ReleaseChannel::Dev => "Zed Editor Dev Instance Running",
-        ReleaseChannel::Nightly => "Zed Editor Nightly Instance Running",
-        ReleaseChannel::Preview => "Zed Editor Preview Instance Running",
-        ReleaseChannel::Stable => "Zed Editor Stable Instance Running",
+fn channel_handshake(release_channel: ReleaseChannel) -> &'static str {
+    match release_channel {
+        ReleaseChannel::Dev => "Kurocto Editor Dev Instance Running",
+        ReleaseChannel::Nightly => "Kurocto Editor Nightly Instance Running",
+        ReleaseChannel::Preview => "Kurocto Editor Preview Instance Running",
+        ReleaseChannel::Stable => "Kurocto Editor Stable Instance Running",
     }
+}
+
+fn instance_handshake() -> &'static str {
+    channel_handshake(*release_channel::RELEASE_CHANNEL)
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -121,5 +133,35 @@ fn check_got_handshake() -> bool {
         }
 
         Err(_) => false,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_handshake_identifies_kurocto() {
+        for release_channel in ReleaseChannel::ALL {
+            let handshake = channel_handshake(release_channel);
+            assert!(handshake.starts_with("Kurocto Editor "), "{handshake}");
+            assert!(handshake.ends_with(" Instance Running"), "{handshake}");
+            assert!(!handshake.contains("Zed"), "{handshake}");
+        }
+    }
+
+    #[test]
+    fn test_ports_do_not_overlap_upstream_zed() {
+        const UPSTREAM_ZED_PORT_BASE: u16 = 43737;
+        let upstream_ports: Vec<u16> = (0..4)
+            .map(|index| UPSTREAM_ZED_PORT_BASE + index * USER_BLOCK)
+            .collect();
+        let mut ports = Vec::new();
+        for release_channel in ReleaseChannel::ALL {
+            let port = channel_port(release_channel);
+            assert!(!upstream_ports.contains(&port), "{port}");
+            assert!(!ports.contains(&port), "{port}");
+            ports.push(port);
+        }
     }
 }

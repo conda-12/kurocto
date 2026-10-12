@@ -2839,12 +2839,12 @@
   // The server to connect to. If the environment variable
   // ZED_SERVER_URL is set, it will override this setting.
   "server_url": "https://zed.dev",
-  // Settings overrides to use when using Zed Preview.
+  // Settings overrides to use when using Kurocto Preview.
   // Mostly useful for developers who are managing multiple instances of Zed.
   "preview": {
     // "theme": "Andromeda"
   },
-  // Settings overrides to use when using Zed Nightly.
+  // Settings overrides to use when using Kurocto Nightly.
   // Mostly useful for developers who are managing multiple instances of Zed.
   "nightly": {
     // "theme": "Andromeda"
@@ -2854,12 +2854,12 @@
       },
     },
   },
-  // Settings overrides to use when using Zed Stable.
+  // Settings overrides to use when using Kurocto.
   // Mostly useful for developers who are managing multiple instances of Zed.
   "stable": {
     // "theme": "Andromeda"
   },
-  // Settings overrides to use when using Kurocto Zed.
+  // Settings overrides to use when using Kurocto Dev.
   // Mostly useful for developers who are managing multiple instances of Zed.
   "dev": {
     // "theme": "Andromeda"

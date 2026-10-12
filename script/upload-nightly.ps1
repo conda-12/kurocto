@@ -15,7 +15,7 @@ $bucketName = "zed-nightly-host"
 $releaseVersion = & "$PSScriptRoot\get-crate-version.ps1" zed
 $version = "$releaseVersion+nightly.$env:GITHUB_RUN_NUMBER.$env:GITHUB_SHA"
 
-$remoteServerFiles = Get-ChildItem -Path "target" -Filter "zed-remote-server-windows-*.zip" -Recurse -File -ErrorAction SilentlyContinue
+$remoteServerFiles = Get-ChildItem -Path "target" -Filter "kurocto-remote-server-windows-*.zip" -Recurse -File -ErrorAction SilentlyContinue
 
 foreach ($file in $remoteServerFiles) {
     UploadToBlobStore -BucketName $bucketName -FileToUpload $file.FullName -BlobStoreKey "nightly/$($file.Name)"
@@ -23,10 +23,10 @@ foreach ($file in $remoteServerFiles) {
     Remove-Item -Path $file.FullName -ErrorAction SilentlyContinue
 }
 
-UploadToBlobStore -BucketName $bucketName -FileToUpload "target/Zed-$Architecture.exe" -BlobStoreKey "nightly/Zed-$Architecture.exe"
-UploadToBlobStore -BucketName $bucketName -FileToUpload "target/Zed-$Architecture.exe" -BlobStoreKey "$version/Zed-$Architecture.exe"
+UploadToBlobStore -BucketName $bucketName -FileToUpload "target/Kurocto-$Architecture.exe" -BlobStoreKey "nightly/Kurocto-$Architecture.exe"
+UploadToBlobStore -BucketName $bucketName -FileToUpload "target/Kurocto-$Architecture.exe" -BlobStoreKey "$version/Kurocto-$Architecture.exe"
 
-Remove-Item -Path "target/Zed-$Architecture.exe" -ErrorAction SilentlyContinue
+Remove-Item -Path "target/Kurocto-$Architecture.exe" -ErrorAction SilentlyContinue
 
 $version | Out-File -FilePath "target/latest-sha" -NoNewline
 UploadToBlobStore -BucketName $bucketName -FileToUpload "target/latest-sha" -BlobStoreKey "nightly/latest-sha-windows"

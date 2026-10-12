@@ -8,23 +8,23 @@ function getZedDataDir() {
   const platform = process.platform;
 
   if (platform === "darwin") {
-    // macOS: ~/Library/Application Support/Zed
-    return path.join(os.homedir(), "Library", "Application Support", "Zed");
+    // macOS: ~/Library/Application Support/Kurocto
+    return path.join(os.homedir(), "Library", "Application Support", "Kurocto");
   } else if (platform === "linux" || platform === "freebsd") {
-    // Linux/FreeBSD: $FLATPAK_XDG_DATA_HOME or XDG_DATA_HOME/zed
+    // Linux/FreeBSD: $FLATPAK_XDG_DATA_HOME or XDG_DATA_HOME/kurocto
     if (process.env.FLATPAK_XDG_DATA_HOME) {
-      return path.join(process.env.FLATPAK_XDG_DATA_HOME, "zed");
+      return path.join(process.env.FLATPAK_XDG_DATA_HOME, "kurocto");
     }
     const xdgDataHome = process.env.XDG_DATA_HOME || path.join(os.homedir(), ".local", "share");
-    return path.join(xdgDataHome, "zed");
+    return path.join(xdgDataHome, "kurocto");
   } else if (platform === "win32") {
-    // Windows: LocalAppData/Zed
+    // Windows: LocalAppData/Kurocto
     const localAppData = process.env.LOCALAPPDATA || path.join(os.homedir(), "AppData", "Local");
-    return path.join(localAppData, "Zed");
+    return path.join(localAppData, "Kurocto");
   } else {
     // Fallback to XDG config dir
     const xdgConfigHome = process.env.XDG_CONFIG_HOME || path.join(os.homedir(), ".config");
-    return path.join(xdgConfigHome, "zed");
+    return path.join(xdgConfigHome, "kurocto");
   }
 }
 

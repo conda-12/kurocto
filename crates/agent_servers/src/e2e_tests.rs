@@ -464,7 +464,7 @@ pub fn get_zed_path() -> PathBuf {
         }
     }
 
-    zed_path.push("zed");
+    zed_path.push("kurocto");
 
     if !zed_path.exists() {
         panic!("\n🚨 Run `cargo build` at least once before running e2e tests\n\n");

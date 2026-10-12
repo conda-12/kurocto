@@ -116,9 +116,9 @@ function GenerateLicenses {
 
 function BuildZedAndItsFriends {
     Write-Output "Building Zed and its friends, for channel: $channel"
-    # Build zed.exe and cli.exe
+    # Build kurocto.exe and cli.exe
     cargo --config .cargo/bundle-config.toml build --release --package zed --package cli --target $target
-    Copy-Item -Path ".\$CargoOutDir\zed.exe" -Destination "$innoDir\Zed.exe" -Force
+    Copy-Item -Path ".\$CargoOutDir\kurocto.exe" -Destination "$innoDir\Kurocto.exe" -Force
     Copy-Item -Path ".\$CargoOutDir\cli.exe" -Destination "$innoDir\cli.exe" -Force
     # Build explorer_command_injector.dll
     switch ($channel) {
@@ -132,7 +132,7 @@ function BuildZedAndItsFriends {
             cargo --config .cargo/bundle-config.toml build --release --package explorer_command_injector --target $target
         }
     }
-    Copy-Item -Path ".\$CargoOutDir\explorer_command_injector.dll" -Destination "$innoDir\zed_explorer_command_injector.dll" -Force
+    Copy-Item -Path ".\$CargoOutDir\explorer_command_injector.dll" -Destination "$innoDir\kurocto_explorer_command_injector.dll" -Force
 }
 
 function BuildRemoteServer {
@@ -147,7 +147,7 @@ function BuildRemoteServer {
         & "$innoDir\sign.ps1" $remoteServerSrc
     }
 
-    $remoteServerDst = "$env:ZED_WORKSPACE\target\zed-remote-server-windows-$Architecture.zip"
+    $remoteServerDst = "$env:ZED_WORKSPACE\target\kurocto-remote-server-windows-$Architecture.zip"
     Write-Output "Compressing remote_server to $remoteServerDst"
     Compress-Archive -Path $remoteServerSrc -DestinationPath $remoteServerDst -Force
 
@@ -156,16 +156,211 @@ function BuildRemoteServer {
 
 function ZipZedAndItsFriendsDebug {
     $items = @(
-        ".\$CargoOutDir\zed.pdb",
+        ".\$CargoOutDir\kurocto.pdb",
         ".\$CargoOutDir\cli.pdb",
         ".\$CargoOutDir\explorer_command_injector.pdb",
         ".\$CargoOutDir\remote_server.pdb"
     )
 
-    Compress-Archive -Path $items -DestinationPath ".\$CargoOutDir\zed-$env:RELEASE_VERSION-$env:ZED_RELEASE_CHANNEL.dbg.zip" -Force
+    Compress-Archive -Path $items -DestinationPath ".\$CargoOutDir\kurocto-$env:RELEASE_VERSION-$env:ZED_RELEASE_CHANNEL.dbg.zip" -Force
 }
 
+function MakeAppx {
+    switch ($channel) {
+        "stable" {
+            $manifestFile = "$env:ZED_WORKSPACE\crates\explorer_command_injector\AppxManifest.xml"
+        }
+        "preview" {
+            $manifestFile = "$env:ZED_WORKSPACE\crates\explorer_command_injector\AppxManifest-Preview.xml"
+        }
+        default {
+            $manifestFile = "$env:ZED_WORKSPACE\crates\explorer_command_injector\AppxManifest-Nightly.xml"
+        }
+    }
+    Copy-Item -Path "$manifestFile" -Destination "$innoDir\make_appx\AppxManifest.xml"
+    # Add makeAppx.exe to Path
+    $sdk = "C:\Program Files (x86)\Windows Kits\10\bin\10.0.26100.0\x64"
+    $env:Path += ';' + $sdk
+    makeAppx.exe pack /d "$innoDir\make_appx" /p "$innoDir\kurocto_explorer_command_injector.appx" /nv
+}
 
+function SignZedAndItsFriends {
+    if (-not $canCodeSign) {
+        return
+    }
+
+    $files = "$innoDir\Kurocto.exe,$innoDir\cli.exe,$innoDir\kurocto_explorer_command_injector.dll,$innoDir\kurocto_explorer_command_injector.appx"
+    & "$innoDir\sign.ps1" $files
+}
+
+function DownloadAMDGpuServices {
+    # If you update the AGS SDK version, please also update the version in `crates/gpui/src/platform/windows/directx_renderer.rs`
+    $url = "https://codeload.github.com/GPUOpen-LibrariesAndSDKs/AGS_SDK/zip/refs/tags/v6.3.0"
+    $zipPath = ".\AGS_SDK_v6.3.0.zip"
+    # Download the AGS SDK zip file
+    Invoke-WebRequest -Uri $url -OutFile $zipPath
+    # Extract the AGS SDK zip file
+    Expand-Archive -Path $zipPath -DestinationPath "." -Force
+}
+
+function DownloadConpty {
+    # TODO: Switch back to the stable channel once Microsoft finally decides to publish v1.26
+    $url = "https://github.com/microsoft/terminal/releases/download/v1.25.1912.0/Microsoft.Windows.Console.ConPTY.1.25.260710002-preview.nupkg"
+    $zipPath = ".\Microsoft.Windows.Console.ConPTY.1.25.260710002-preview.nupkg"
+    Invoke-WebRequest -Uri $url -OutFile $zipPath
+    Expand-Archive -Path $zipPath -DestinationPath ".\conpty" -Force
+}
+
+function CollectFiles {
+    Move-Item -Path "$innoDir\kurocto_explorer_command_injector.appx" -Destination "$innoDir\appx\kurocto_explorer_command_injector.appx" -Force
+    Move-Item -Path "$innoDir\kurocto_explorer_command_injector.dll" -Destination "$innoDir\appx\kurocto_explorer_command_injector.dll" -Force
+    Move-Item -Path "$innoDir\cli.exe" -Destination "$innoDir\bin\kurocto.exe" -Force
+    Move-Item -Path "$innoDir\zed.sh" -Destination "$innoDir\bin\kurocto" -Force
+    if($Architecture -eq "aarch64") {
+        New-Item -Type Directory -Path "$innoDir\arm64" -Force
+        Move-Item -Path ".\conpty\build\native\runtimes\arm64\OpenConsole.exe" -Destination "$innoDir\arm64\OpenConsole.exe" -Force
+        Move-Item -Path ".\conpty\runtimes\win-arm64\native\conpty.dll" -Destination "$innoDir\conpty.dll" -Force
+    }
+    else {
+        New-Item -Type Directory -Path "$innoDir\x64" -Force
+        New-Item -Type Directory -Path "$innoDir\arm64" -Force
+        Move-Item -Path ".\AGS_SDK-6.3.0\ags_lib\lib\amd_ags_x64.dll" -Destination "$innoDir\amd_ags_x64.dll" -Force
+        Move-Item -Path ".\conpty\build\native\runtimes\x64\OpenConsole.exe" -Destination "$innoDir\x64\OpenConsole.exe" -Force
+        Move-Item -Path ".\conpty\build\native\runtimes\arm64\OpenConsole.exe" -Destination "$innoDir\arm64\OpenConsole.exe" -Force
+        Move-Item -Path ".\conpty\runtimes\win-x64\native\conpty.dll" -Destination "$innoDir\conpty.dll" -Force
+    }
+}
+
+function BuildInstaller {
+    $issFilePath = "$innoDir\zed.iss"
+    switch ($channel) {
+        "stable" {
+            $appId = "{{CF1A23C5-9F36-43BD-B494-BC940CA2B3A2}"
+            $appIconName = "app-icon"
+            $appName = "Kurocto"
+            $appDisplayName = "Kurocto"
+            $appSetupName = "Kurocto-$Architecture"
+            # The mutex name here should match the mutex name in crates\zed\src\zed\windows_only_instance.rs
+            $appMutex = "Kurocto-Editor-Stable-Instance-Mutex"
+            $appExeName = "Kurocto"
+            $regValueName = "Kurocto"
+            $appUserId = "Kurocto.Kurocto"
+            $appShellNameShort = "&Kurocto"
+            $appAppxFullName = "Kurocto.Kurocto_1.0.0.0_neutral__fszf7e02t5qa2"
+        }
+        "preview" {
+            $appId = "{{0BECA00A-ED07-46C6-9F94-0B713D67869B}"
+            $appIconName = "app-icon-preview"
+            $appName = "Kurocto Preview"
+            $appDisplayName = "Kurocto Preview"
+            $appSetupName = "Kurocto-$Architecture"
+            # The mutex name here should match the mutex name in crates\zed\src\zed\windows_only_instance.rs
+            $appMutex = "Kurocto-Editor-Preview-Instance-Mutex"
+            $appExeName = "Kurocto"
+            $regValueName = "KuroctoPreview"
+            $appUserId = "Kurocto.Kurocto.Preview"
+            $appShellNameShort = "&Kurocto Preview"
+            $appAppxFullName = "Kurocto.Kurocto.Preview_1.0.0.0_neutral__fszf7e02t5qa2"
+        }
+        "nightly" {
+            $appId = "{{687B82DC-606B-4C96-A59A-EBAAFEBC8D3B}"
+            $appIconName = "app-icon-nightly"
+            $appName = "Kurocto Nightly"
+            $appDisplayName = "Kurocto Nightly"
+            $appSetupName = "Kurocto-$Architecture"
+            # The mutex name here should match the mutex name in crates\zed\src\zed\windows_only_instance.rs
+            $appMutex = "Kurocto-Editor-Nightly-Instance-Mutex"
+            $appExeName = "Kurocto"
+            $regValueName = "KuroctoNightly"
+            $appUserId = "Kurocto.Kurocto.Nightly"
+            $appShellNameShort = "&Kurocto Nightly"
+            $appAppxFullName = "Kurocto.Kurocto.Nightly_1.0.0.0_neutral__fszf7e02t5qa2"
+        }
+        "dev" {
+            $appId = "{{F609BF45-E955-4A78-ABD2-90E7EC0B79BB}"
+            $appIconName = "app-icon-dev"
+            $appName = "Kurocto Dev"
+            $appDisplayName = "Kurocto Dev"
+            $appSetupName = "Kurocto-$Architecture"
+            # The mutex name here should match the mutex name in crates\zed\src\zed\windows_only_instance.rs
+            $appMutex = "Kurocto-Editor-Dev-Instance-Mutex"
+            $appExeName = "Kurocto"
+            $regValueName = "KuroctoDev"
+            $appUserId = "Kurocto.Kurocto.Dev"
+            $appShellNameShort = "&Kurocto Dev"
+            $appAppxFullName = "Kurocto.Kurocto.Dev_1.0.0.0_neutral__fszf7e02t5qa2"
+        }
+        default {
+            Write-Error "can't bundle installer for $channel."
+            exit 1
+        }
+    }
+
+    # Windows runner 2022 default has iscc in PATH, https://github.com/actions/runner-images/blob/main/images/windows/Windows2022-Readme.md
+    # Currently, we are using Windows 2022 runner.
+    # Windows runner 2025 doesn't have iscc in PATH for now, https://github.com/actions/runner-images/issues/11228
+    $innoSetupPath = "C:\Program Files (x86)\Inno Setup 6\ISCC.exe"
+
+    $definitions = @{
+        "AppId"          = $appId
+        "AppIconName"    = $appIconName
+        "OutputDir"      = "$env:ZED_WORKSPACE\target"
+        "AppSetupName"   = $appSetupName
+        "AppName"        = $appName
+        "AppDisplayName" = $appDisplayName
+        "RegValueName"   = $regValueName
+        "AppMutex"       = $appMutex
+        "AppExeName"     = $appExeName
+        "ResourcesDir"   = "$innoDir"
+        "ShellNameShort" = $appShellNameShort
+        "AppUserId"      = $appUserId
+        "Version"        = "$env:RELEASE_VERSION"
+        "SourceDir"      = "$env:ZED_WORKSPACE"
+        "AppxFullName"   = $appAppxFullName
+    }
+
+    $defs = @()
+    foreach ($key in $definitions.Keys) {
+        $defs += "/d$key=`"$($definitions[$key])`""
+    }
+
+    $innoArgs = @($issFilePath) + $defs
+    if($canCodeSign) {
+        # Checked by zed.iss to decide whether to sign the installer.
+        $env:ZED_SIGN_BUNDLE = "1"
+        $signTool = "powershell.exe -ExecutionPolicy Bypass -File $innoDir\sign.ps1 `$f"
+        $innoArgs += "/sDefaultsign=`"$signTool`""
+    }
+
+    # Execute Inno Setup
+    Write-Host "🚀 Running Inno Setup: $innoSetupPath $innoArgs"
+    $process = Start-Process -FilePath $innoSetupPath -ArgumentList $innoArgs -NoNewWindow -Wait -PassThru
+
+    if ($process.ExitCode -eq 0) {
+        Write-Host "✅ Inno Setup successfully compiled the installer"
+        Write-Output "SETUP_PATH=target/$appSetupName.exe" >> $env:GITHUB_ENV
+        $script:buildSuccess = $true
+    }
+    else {
+        Write-Host "❌ Inno Setup failed: $($process.ExitCode)"
+        $script:buildSuccess = $false
+    }
+}
+
+ParseZedWorkspace
+$innoDir = "$env:ZED_WORKSPACE\inno\$Architecture"
+$debugArchive = "$CargoOutDir\kurocto-$env:RELEASE_VERSION-$env:ZED_RELEASE_CHANNEL.dbg.zip"
+$debugStoreKey = "$env:ZED_RELEASE_CHANNEL/kurocto-$env:RELEASE_VERSION-$env:ZED_RELEASE_CHANNEL.dbg.zip"
+
+CheckEnvironmentVariables
+PrepareForBundle
+GenerateLicenses
+BuildZedAndItsFriends
+BuildRemoteServer
+MakeAppx
+SignZedAndItsFriends
+ZipZedAndItsFriendsDebug
+DownloadAMDGpuServices
 DownloadConpty
 CollectFiles
 BuildInstaller
@@ -174,7 +369,7 @@ if ($buildSuccess) {
     Write-Output "Build successful"
     if ($Install) {
         Write-Output "Installing Zed..."
-        Start-Process -FilePath "$env:ZED_WORKSPACE/target/ZedEditorUserSetup-x64-$env:RELEASE_VERSION.exe"
+        Start-Process -FilePath "$env:ZED_WORKSPACE/target/Kurocto-$Architecture.exe"
     }
     exit 0
 }

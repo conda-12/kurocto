@@ -922,7 +922,7 @@ impl AcpConnection {
                 acp::InitializeRequest::new(ProtocolVersion::V1)
                     .client_capabilities(client_capabilities_for_agent(&agent_id))
                     .client_info(
-                        acp::Implementation::new("zed", version)
+                        acp::Implementation::new("kurocto", version)
                             .title(release_channel.map(ToOwned::to_owned)),
                     ),
             )

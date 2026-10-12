@@ -416,8 +416,8 @@ impl ProtoClient for Client {
     }
 }
 
-/// prefix for the zed:// url scheme
-pub const ZED_URL_SCHEME: &str = "zed";
+/// The URL scheme registered with the operating system for links into the application.
+pub const ZED_URL_SCHEME: &str = "kurocto";
 
 #[cfg(test)]
 mod tests {

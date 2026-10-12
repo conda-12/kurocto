@@ -36,7 +36,7 @@ jobs:
         name: zed
         authToken: ${{ secrets.CACHIX_AUTH_TOKEN }}
         cachixArgs: -v
-        pushFilter: -zed-editor-[0-9.]*
+        pushFilter: -kurocto-editor-[0-9.]*
     - name: nix_build::build_nix::build
       run: nix build .#default -L --accept-flake-config
     timeout-minutes: 60
@@ -71,7 +71,7 @@ jobs:
         name: zed
         authToken: ${{ secrets.CACHIX_AUTH_TOKEN }}
         cachixArgs: -v
-        pushFilter: -zed-editor-[0-9.]*
+        pushFilter: -kurocto-editor-[0-9.]*
     - name: nix_build::build_nix::build
       run: nix build .#default -L --accept-flake-config
     - name: nix_build::build_nix::export_to_local_nix_cache

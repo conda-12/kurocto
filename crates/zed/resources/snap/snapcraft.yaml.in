@@ -1,5 +1,5 @@
-name: zed
-title: Zed
+name: kurocto
+title: Kurocto
 base: core24
 version: "$RELEASE_VERSION"
 summary: The editor for what's next
@@ -9,15 +9,14 @@ description: |
 grade: stable
 confinement: classic
 compression: lzo
-website: https://zed.dev/
-source-code: https://github.com/zed-industries/zed
-issues: https://github.com/zed-industries/zed/issues
-contact: https://zed.dev/community-links#support-and-feedback
+website: https://github.com/conda-12/kurocto
+source-code: https://github.com/conda-12/kurocto
+issues: https://github.com/conda-12/kurocto/issues
 
 parts:
-  zed:
+  kurocto:
     plugin: dump
-    source: "https://github.com/zed-industries/zed/releases/download/v$RELEASE_VERSION/zed-linux-x86_64.tar.gz"
+    source: "https://github.com/conda-12/kurocto/releases/download/v$RELEASE_VERSION/kurocto-linux-x86_64.tar.gz"
 
     organize:
       # These renames seem to not be necessary, but it's tidier.
@@ -52,8 +51,8 @@ parts:
       - -usr/share/man
 
 apps:
-  zed:
-    command: usr/bin/zed
-    common-id: dev.zed.Zed
+  kurocto:
+    command: usr/bin/kurocto
+    common-id: dev.kurocto.Kurocto
     environment:
       ZED_BUNDLE_TYPE: snap

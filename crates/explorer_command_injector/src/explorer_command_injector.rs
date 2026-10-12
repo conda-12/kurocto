@@ -44,7 +44,7 @@ struct ExplorerCommandInjector;
 impl IExplorerCommand_Impl for ExplorerCommandInjector_Impl {
     fn GetTitle(&self, _: Ref<IShellItemArray>) -> Result<windows_core::PWSTR> {
         let command_description =
-            retrieve_command_description().unwrap_or(HSTRING::from("Open with Zed"));
+            retrieve_command_description().unwrap_or(HSTRING::from("Open with Kurocto"));
         unsafe { SHStrDupW(&command_description) }
     }
 
@@ -128,10 +128,10 @@ impl IClassFactory_Impl for ExplorerCommandInjectorFactory_Impl {
 }
 
 const MODULE_ID: GUID = cfg_select! {
-    feature = "stable" => { GUID::from_u128(0x6a1f6b13_3b82_48a1_9e06_7bb0a6d0bffd) },
-    feature = "preview" => { GUID::from_u128(0xaf8e85ea_fb20_4db2_93cf_56513c1ec697) },
-    feature = "nightly" => { GUID::from_u128(0x266f2cfe_1653_42af_b55c_fe3590c83871) },
-    _ => { GUID::from_u128(0x685f4d49_6718_4c55_b271_ebb5c6a48d6f) },
+    feature = "stable" => { GUID::from_u128(0xf5c27f7e_0d13_4cc2_9f60_7d0a8a9af256) },
+    feature = "preview" => { GUID::from_u128(0xdbc86880_58f4_4c53_84d8_b41b10d9e6df) },
+    feature = "nightly" => { GUID::from_u128(0xa8a9310b_9c75_4025_8c94_8226bd877fee) },
+    _ => { GUID::from_u128(0x7448bd6a_81e3_4801_a244_94f208a7c7af) },
 };
 
 #[unsafe(no_mangle)]
@@ -174,16 +174,16 @@ fn get_zed_install_folder() -> Option<PathBuf> {
 
 #[inline]
 fn get_zed_exe_path() -> Option<String> {
-    get_zed_install_folder().map(|path| path.join("Zed.exe").to_string_lossy().into_owned())
+    get_zed_install_folder().map(|path| path.join("Kurocto.exe").to_string_lossy().into_owned())
 }
 
 #[inline]
 fn retrieve_command_description() -> Result<HSTRING> {
     const REG_PATH: &str = cfg_select! {
-        feature = "stable" => { r#"Software\Classes\ZedContextMenu"# },
-        feature = "preview" => { r#"Software\Classes\ZedPreviewContextMenu"# },
-        feature = "nightly" => { r#"Software\Classes\ZedNightlyContextMenu"# },
-        _ => { r#"Software\Classes\ZedDevContextMenu"# },
+        feature = "stable" => { r#"Software\Classes\KuroctoContextMenu"# },
+        feature = "preview" => { r#"Software\Classes\KuroctoPreviewContextMenu"# },
+        feature = "nightly" => { r#"Software\Classes\KuroctoNightlyContextMenu"# },
+        _ => { r#"Software\Classes\KuroctoDevContextMenu"# },
     };
 
     let key = windows_registry::CURRENT_USER.open(REG_PATH)?;

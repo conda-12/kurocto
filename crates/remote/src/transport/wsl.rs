@@ -225,7 +225,7 @@ impl WslRemoteConnection {
         };
 
         let binary_name = format!(
-            "zed-remote-server-{}-{}",
+            "kurocto-remote-server-{}-{}",
             release_channel.dev_name(),
             version_str
         );
@@ -351,7 +351,7 @@ impl WslRemoteConnection {
         let mut command = wsl_command_impl(
             &self.connection_options,
             "sh",
-            &["-c", "cat > \"$1\"", "zed-upload", dst_posix.as_ref()],
+            &["-c", "cat > \"$1\"", "kurocto-upload", dst_posix.as_ref()],
             true,
         );
         command.kill_on_drop(true);

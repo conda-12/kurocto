@@ -11,9 +11,9 @@ main() {
     channel="${ZED_CHANNEL:-stable}"
     # Use TMPDIR if available (for environments with non-standard temp directories)
     if [ -n "${TMPDIR:-}" ] && [ -d "${TMPDIR}" ]; then
-        temp="$(mktemp -d "$TMPDIR/zed-XXXXXX")"
+        temp="$(mktemp -d "$TMPDIR/kurocto-XXXXXX")"
     else
-        temp="$(mktemp -d "/tmp/zed-XXXXXX")"
+        temp="$(mktemp -d "/tmp/kurocto-XXXXXX")"
     fi
 
     if [ "$platform" != "Linux" ]; then
@@ -36,10 +36,10 @@ main() {
 
     linux "$@"
 
-    if [ "$(command -v zed)" = "$HOME/.local/bin/zed" ]; then
-        echo "Zed has been installed. Run with 'zed'"
+    if [ "$(command -v kurocto)" = "$HOME/.local/bin/kurocto" ]; then
+        echo "Kurocto has been installed. Run with 'kurocto'"
     else
-        echo "To run Zed from your terminal, you must add ~/.local/bin to your PATH"
+        echo "To run Kurocto from your terminal, you must add ~/.local/bin to your PATH"
         echo "Run:"
 
         case "$SHELL" in
@@ -56,7 +56,7 @@ main() {
                 ;;
         esac
 
-        echo "To run Zed now, '~/.local/bin/zed'"
+        echo "To run Kurocto now, '~/.local/bin/kurocto'"
     fi
 }
 
@@ -65,7 +65,7 @@ linux() {
         echo "ZED_BUNDLE_PATH is not set. Build a bundle with script/bundle-linux and set ZED_BUNDLE_PATH to the resulting tarball, or run script/install-linux."
         exit 1
     fi
-    cp "$ZED_BUNDLE_PATH" "$temp/zed-linux-$arch.tar.gz"
+    cp "$ZED_BUNDLE_PATH" "$temp/kurocto-linux-$arch.tar.gz"
 
     suffix=""
     if [ "$channel" != "stable" ]; then
@@ -75,35 +75,35 @@ linux() {
     appid=""
     case "$channel" in
       stable)
-        appid="dev.zed.Zed"
+        appid="dev.kurocto.Kurocto"
         ;;
       nightly)
-        appid="dev.zed.Zed-Nightly"
+        appid="dev.kurocto.Kurocto-Nightly"
         ;;
       preview)
-        appid="dev.zed.Zed-Preview"
+        appid="dev.kurocto.Kurocto-Preview"
         ;;
       dev)
-        appid="dev.zed.Zed-Dev"
+        appid="dev.kurocto.Kurocto-Dev"
         ;;
       *)
         echo "Unknown release channel: ${channel}. Using stable app ID."
-        appid="dev.zed.Zed"
+        appid="dev.kurocto.Kurocto"
         ;;
     esac
 
     # Unpack
-    rm -rf "$HOME/.local/zed$suffix.app"
-    mkdir -p "$HOME/.local/zed$suffix.app"
-    tar -xzf "$temp/zed-linux-$arch.tar.gz" -C "$HOME/.local/"
+    rm -rf "$HOME/.local/kurocto$suffix.app"
+    mkdir -p "$HOME/.local/kurocto$suffix.app"
+    tar -xzf "$temp/kurocto-linux-$arch.tar.gz" -C "$HOME/.local/"
 
-    zed_editor="$HOME/.local/zed$suffix.app/libexec/zed-editor"
+    zed_editor="$HOME/.local/kurocto$suffix.app/libexec/kurocto-editor"
     if [ -f "$zed_editor" ] && command -v ldd >/dev/null 2>&1; then
         missing="$(ldd "$zed_editor" 2>/dev/null | sed -n 's/^[[:space:]]*\(.*\) => not found$/\1/p')"
         if [ -n "$missing" ]; then
-            echo "Warning: your system is missing libraries that Zed needs:"
+            echo "Warning: your system is missing libraries that Kurocto needs:"
             echo "$missing" | sed 's/^/    /'
-            echo "Install them with your package manager, or Zed will fail to start."
+            echo "Install them with your package manager, or Kurocto will fail to start."
         fi
     fi
 
@@ -111,24 +111,24 @@ linux() {
     mkdir -p "$HOME/.local/bin" "$HOME/.local/share/applications"
 
     # Link the binary
-    if [ -f "$HOME/.local/zed$suffix.app/bin/zed" ]; then
-        ln -sf "$HOME/.local/zed$suffix.app/bin/zed" "$HOME/.local/bin/zed"
+    if [ -f "$HOME/.local/kurocto$suffix.app/bin/kurocto" ]; then
+        ln -sf "$HOME/.local/kurocto$suffix.app/bin/kurocto" "$HOME/.local/bin/kurocto"
     else
         # support for versions before 0.139.x.
-        ln -sf "$HOME/.local/zed$suffix.app/bin/cli" "$HOME/.local/bin/zed"
+        ln -sf "$HOME/.local/kurocto$suffix.app/bin/cli" "$HOME/.local/bin/kurocto"
     fi
 
     # Copy .desktop file
     desktop_file_path="$HOME/.local/share/applications/${appid}.desktop"
-    src_dir="$HOME/.local/zed$suffix.app/share/applications"
+    src_dir="$HOME/.local/kurocto$suffix.app/share/applications"
     if [ -f "$src_dir/${appid}.desktop" ]; then
         cp "$src_dir/${appid}.desktop" "${desktop_file_path}"
     else
         # Fallback for older tarballs
-        cp "$src_dir/zed$suffix.desktop" "${desktop_file_path}"
+        cp "$src_dir/kurocto$suffix.desktop" "${desktop_file_path}"
     fi
-    sed -i "s|Icon=zed|Icon=$HOME/.local/zed$suffix.app/share/icons/hicolor/512x512/apps/zed.png|g" "${desktop_file_path}"
-    sed -i "s|Exec=zed|Exec=$HOME/.local/zed$suffix.app/bin/zed|g" "${desktop_file_path}"
+    sed -i "s|Icon=kurocto|Icon=$HOME/.local/kurocto$suffix.app/share/icons/hicolor/512x512/apps/kurocto.png|g" "${desktop_file_path}"
+    sed -i "s|Exec=kurocto|Exec=$HOME/.local/kurocto$suffix.app/bin/kurocto|g" "${desktop_file_path}"
 }
 
 main "$@"

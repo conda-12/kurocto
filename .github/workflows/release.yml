@@ -396,14 +396,14 @@ jobs:
     - name: run_bundling::upload_artifact
       uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
       with:
-        name: zed-linux-aarch64.tar.gz
-        path: target/release/zed-linux-aarch64.tar.gz
+        name: kurocto-linux-aarch64.tar.gz
+        path: target/release/kurocto-linux-aarch64.tar.gz
         if-no-files-found: error
     - name: run_bundling::upload_artifact
       uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
       with:
-        name: zed-remote-server-linux-aarch64.gz
-        path: target/zed-remote-server-linux-aarch64.gz
+        name: kurocto-remote-server-linux-aarch64.gz
+        path: target/kurocto-remote-server-linux-aarch64.gz
         if-no-files-found: error
     timeout-minutes: 60
   bundle_linux_x86_64:
@@ -436,14 +436,14 @@ jobs:
     - name: run_bundling::upload_artifact
       uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
       with:
-        name: zed-linux-x86_64.tar.gz
-        path: target/release/zed-linux-x86_64.tar.gz
+        name: kurocto-linux-x86_64.tar.gz
+        path: target/release/kurocto-linux-x86_64.tar.gz
         if-no-files-found: error
     - name: run_bundling::upload_artifact
       uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
       with:
-        name: zed-remote-server-linux-x86_64.gz
-        path: target/zed-remote-server-linux-x86_64.gz
+        name: kurocto-remote-server-linux-x86_64.gz
+        path: target/kurocto-remote-server-linux-x86_64.gz
         if-no-files-found: error
     timeout-minutes: 60
   build_static_bwrap_linux_aarch64:
@@ -563,14 +563,14 @@ jobs:
     - name: run_bundling::upload_artifact
       uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
       with:
-        name: Zed-aarch64.dmg
-        path: target/aarch64-apple-darwin/release/Zed-aarch64.dmg
+        name: Kurocto-aarch64.dmg
+        path: target/aarch64-apple-darwin/release/Kurocto-aarch64.dmg
         if-no-files-found: error
     - name: run_bundling::upload_artifact
       uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
       with:
-        name: zed-remote-server-macos-aarch64.gz
-        path: target/zed-remote-server-macos-aarch64.gz
+        name: kurocto-remote-server-macos-aarch64.gz
+        path: target/kurocto-remote-server-macos-aarch64.gz
         if-no-files-found: error
     timeout-minutes: 60
   bundle_mac_x86_64:
@@ -620,14 +620,14 @@ jobs:
     - name: run_bundling::upload_artifact
       uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
       with:
-        name: Zed-x86_64.dmg
-        path: target/x86_64-apple-darwin/release/Zed-x86_64.dmg
+        name: Kurocto-x86_64.dmg
+        path: target/x86_64-apple-darwin/release/Kurocto-x86_64.dmg
         if-no-files-found: error
     - name: run_bundling::upload_artifact
       uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
       with:
-        name: zed-remote-server-macos-x86_64.gz
-        path: target/zed-remote-server-macos-x86_64.gz
+        name: kurocto-remote-server-macos-x86_64.gz
+        path: target/kurocto-remote-server-macos-x86_64.gz
         if-no-files-found: error
     timeout-minutes: 60
   bundle_windows_aarch64:
@@ -662,14 +662,14 @@ jobs:
     - name: run_bundling::upload_artifact
       uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
       with:
-        name: Zed-aarch64.exe
-        path: target/Zed-aarch64.exe
+        name: Kurocto-aarch64.exe
+        path: target/Kurocto-aarch64.exe
         if-no-files-found: error
     - name: run_bundling::upload_artifact
       uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
       with:
-        name: zed-remote-server-windows-aarch64.zip
-        path: target/zed-remote-server-windows-aarch64.zip
+        name: kurocto-remote-server-windows-aarch64.zip
+        path: target/kurocto-remote-server-windows-aarch64.zip
         if-no-files-found: error
     timeout-minutes: 60
   bundle_windows_x86_64:
@@ -704,14 +704,14 @@ jobs:
     - name: run_bundling::upload_artifact
       uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
       with:
-        name: Zed-x86_64.exe
-        path: target/Zed-x86_64.exe
+        name: Kurocto-x86_64.exe
+        path: target/Kurocto-x86_64.exe
         if-no-files-found: error
     - name: run_bundling::upload_artifact
       uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
       with:
-        name: zed-remote-server-windows-x86_64.zip
-        path: target/zed-remote-server-windows-x86_64.zip
+        name: kurocto-remote-server-windows-x86_64.zip
+        path: target/kurocto-remote-server-windows-x86_64.zip
         if-no-files-found: error
     timeout-minutes: 60
   upload_release_assets:
@@ -739,20 +739,20 @@ jobs:
       run: |-
         mkdir -p release-artifacts/
 
-        mv ./artifacts/Zed-aarch64.dmg/Zed-aarch64.dmg release-artifacts/Zed-aarch64.dmg
-        mv ./artifacts/Zed-x86_64.dmg/Zed-x86_64.dmg release-artifacts/Zed-x86_64.dmg
-        mv ./artifacts/zed-linux-aarch64.tar.gz/zed-linux-aarch64.tar.gz release-artifacts/zed-linux-aarch64.tar.gz
-        mv ./artifacts/zed-linux-x86_64.tar.gz/zed-linux-x86_64.tar.gz release-artifacts/zed-linux-x86_64.tar.gz
+        mv ./artifacts/Kurocto-aarch64.dmg/Kurocto-aarch64.dmg release-artifacts/Kurocto-aarch64.dmg
+        mv ./artifacts/Kurocto-x86_64.dmg/Kurocto-x86_64.dmg release-artifacts/Kurocto-x86_64.dmg
+        mv ./artifacts/kurocto-linux-aarch64.tar.gz/kurocto-linux-aarch64.tar.gz release-artifacts/kurocto-linux-aarch64.tar.gz
+        mv ./artifacts/kurocto-linux-x86_64.tar.gz/kurocto-linux-x86_64.tar.gz release-artifacts/kurocto-linux-x86_64.tar.gz
         mv ./artifacts/bwrap-linux-aarch64.gz/bwrap-linux-aarch64.gz release-artifacts/bwrap-linux-aarch64.gz
         mv ./artifacts/bwrap-linux-x86_64.gz/bwrap-linux-x86_64.gz release-artifacts/bwrap-linux-x86_64.gz
-        mv ./artifacts/Zed-x86_64.exe/Zed-x86_64.exe release-artifacts/Zed-x86_64.exe
-        mv ./artifacts/Zed-aarch64.exe/Zed-aarch64.exe release-artifacts/Zed-aarch64.exe
-        mv ./artifacts/zed-remote-server-macos-aarch64.gz/zed-remote-server-macos-aarch64.gz release-artifacts/zed-remote-server-macos-aarch64.gz
-        mv ./artifacts/zed-remote-server-macos-x86_64.gz/zed-remote-server-macos-x86_64.gz release-artifacts/zed-remote-server-macos-x86_64.gz
-        mv ./artifacts/zed-remote-server-linux-aarch64.gz/zed-remote-server-linux-aarch64.gz release-artifacts/zed-remote-server-linux-aarch64.gz
-        mv ./artifacts/zed-remote-server-linux-x86_64.gz/zed-remote-server-linux-x86_64.gz release-artifacts/zed-remote-server-linux-x86_64.gz
-        mv ./artifacts/zed-remote-server-windows-aarch64.zip/zed-remote-server-windows-aarch64.zip release-artifacts/zed-remote-server-windows-aarch64.zip
-        mv ./artifacts/zed-remote-server-windows-x86_64.zip/zed-remote-server-windows-x86_64.zip release-artifacts/zed-remote-server-windows-x86_64.zip
+        mv ./artifacts/Kurocto-x86_64.exe/Kurocto-x86_64.exe release-artifacts/Kurocto-x86_64.exe
+        mv ./artifacts/Kurocto-aarch64.exe/Kurocto-aarch64.exe release-artifacts/Kurocto-aarch64.exe
+        mv ./artifacts/kurocto-remote-server-macos-aarch64.gz/kurocto-remote-server-macos-aarch64.gz release-artifacts/kurocto-remote-server-macos-aarch64.gz
+        mv ./artifacts/kurocto-remote-server-macos-x86_64.gz/kurocto-remote-server-macos-x86_64.gz release-artifacts/kurocto-remote-server-macos-x86_64.gz
+        mv ./artifacts/kurocto-remote-server-linux-aarch64.gz/kurocto-remote-server-linux-aarch64.gz release-artifacts/kurocto-remote-server-linux-aarch64.gz
+        mv ./artifacts/kurocto-remote-server-linux-x86_64.gz/kurocto-remote-server-linux-x86_64.gz release-artifacts/kurocto-remote-server-linux-x86_64.gz
+        mv ./artifacts/kurocto-remote-server-windows-aarch64.zip/kurocto-remote-server-windows-aarch64.zip release-artifacts/kurocto-remote-server-windows-aarch64.zip
+        mv ./artifacts/kurocto-remote-server-windows-x86_64.zip/kurocto-remote-server-windows-x86_64.zip release-artifacts/kurocto-remote-server-windows-x86_64.zip
     - name: gh release upload "$GITHUB_REF_NAME" --repo=zed-industries/zed release-artifacts/*
       run: gh release upload "$GITHUB_REF_NAME" --repo=zed-industries/zed release-artifacts/*
       env:
@@ -766,7 +766,7 @@ jobs:
     steps:
     - name: release::validate_release_assets
       run: |
-        EXPECTED_ASSETS='["Zed-aarch64.dmg", "Zed-x86_64.dmg", "zed-linux-aarch64.tar.gz", "zed-linux-x86_64.tar.gz", "bwrap-linux-aarch64.gz", "bwrap-linux-x86_64.gz", "Zed-x86_64.exe", "Zed-aarch64.exe", "zed-remote-server-macos-aarch64.gz", "zed-remote-server-macos-x86_64.gz", "zed-remote-server-linux-aarch64.gz", "zed-remote-server-linux-x86_64.gz", "zed-remote-server-windows-aarch64.zip", "zed-remote-server-windows-x86_64.zip"]'
+        EXPECTED_ASSETS='["Kurocto-aarch64.dmg", "Kurocto-x86_64.dmg", "kurocto-linux-aarch64.tar.gz", "kurocto-linux-x86_64.tar.gz", "bwrap-linux-aarch64.gz", "bwrap-linux-x86_64.gz", "Kurocto-x86_64.exe", "Kurocto-aarch64.exe", "kurocto-remote-server-macos-aarch64.gz", "kurocto-remote-server-macos-x86_64.gz", "kurocto-remote-server-linux-aarch64.gz", "kurocto-remote-server-linux-x86_64.gz", "kurocto-remote-server-windows-aarch64.zip", "kurocto-remote-server-windows-x86_64.zip"]'
         TAG="$GITHUB_REF_NAME"
 
         ACTUAL_ASSETS=$(gh release view "$TAG" --repo=zed-industries/zed --json assets -q '[.assets[].name]')

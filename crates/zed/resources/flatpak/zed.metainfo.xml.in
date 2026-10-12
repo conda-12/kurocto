@@ -6,8 +6,8 @@
 
     <name>$APP_NAME</name>
     <summary>High-performance, multiplayer code editor</summary>
-    <developer id="dev.zed">
-        <name translate="no">Zed Industries, Inc.</name>
+    <developer id="dev.kurocto">
+        <name translate="no">Kurocto contributors</name>
     </developer>
     <description>
         <p>
@@ -34,13 +34,10 @@
         <content_attribute id="social-audio">intense</content_attribute>
     </content_rating>
 
-    <url type="homepage">https://zed.dev</url>
-    <url type="bugtracker">https://github.com/zed-industries/zed/issues</url>
-    <url type="faq">https://zed.dev/faq</url>
-    <url type="help">https://zed.dev/docs/getting-started</url>
-    <url type="contact">https://zed.dev/community-links</url>
-    <url type="vcs-browser">https://github.com/zed-industries/zed</url>
-    <url type="contribute">https://github.com/zed-industries/zed/blob/main/CONTRIBUTING.md</url>
+    <url type="homepage">https://github.com/conda-12/kurocto</url>
+    <url type="bugtracker">https://github.com/conda-12/kurocto/issues</url>
+    <url type="vcs-browser">https://github.com/conda-12/kurocto</url>
+    <url type="contribute">https://github.com/conda-12/kurocto/blob/main/CONTRIBUTING.md</url>
 
     <supports>
         <internet>offline-only</internet>

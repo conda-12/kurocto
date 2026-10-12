@@ -101,7 +101,7 @@ fi
 
 # Binary
 # mkdir -p "${zed_dir}/bin" "${zed_dir}/libexec"
-# cp "${target_dir}/${target_triple}/release/zed" "${zed_dir}/libexec/zed-editor"
+# cp "${target_dir}/${target_triple}/release/zed" "${zed_dir}/libexec/kurocto-editor"
 # cp "${target_dir}/${target_triple}/release/cli" "${zed_dir}/bin/zed"
 
 # Libs
@@ -131,7 +131,7 @@ fi
 # elif [[ "$channel" == "nightly" ]]; then
 #     export APP_NAME="Zed Nightly"
 # elif [[ "$channel" == "dev" ]]; then
-#     export APP_NAME="Zed Devel"
+#     export APP_NAME="Kurocto Dev"
 # else
 #     export APP_NAME="Zed"
 # fi
@@ -158,4 +158,4 @@ arch=$(uname -m)
 # tar -czvf "${target_dir}/release/$archive" -C ${temp_dir} "zed$suffix.app"
 
 gzip -f --stdout --best "${target_dir}/${remote_server_triple}/release/remote_server" \
-    > "${target_dir}/zed-remote-server-freebsd-x86_64.gz"
+    > "${target_dir}/kurocto-remote-server-freebsd-x86_64.gz"

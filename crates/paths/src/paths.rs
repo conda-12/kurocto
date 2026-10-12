@@ -15,7 +15,7 @@ pub const EDITORCONFIG_NAME: &str = ".editorconfig";
 /// and state directory paths.
 ///
 /// Forks should change this to avoid colliding with Zed's user data.
-pub const APP_NAME: &str = "Zed";
+pub const APP_NAME: &str = "Kurocto";
 
 /// Lowercased form of [`APP_NAME`], for use in XDG-style paths on
 /// Linux/FreeBSD and the macOS `~/.config` fallback.
@@ -53,30 +53,30 @@ static CUSTOM_DATA_DIR: OnceLock<PathBuf> = OnceLock::new();
 
 /// The resolved data directory, combining custom override or platform defaults.
 /// This is set once and cached for subsequent calls.
-/// On macOS, this is `~/Library/Application Support/Zed`.
-/// On Linux/FreeBSD, this is `$XDG_DATA_HOME/zed`.
-/// On Windows, this is `%LOCALAPPDATA%\Zed`.
+/// On macOS, this is `~/Library/Application Support/Kurocto`.
+/// On Linux/FreeBSD, this is `$XDG_DATA_HOME/kurocto`.
+/// On Windows, this is `%LOCALAPPDATA%\Kurocto`.
 static CURRENT_DATA_DIR: OnceLock<PathBuf> = OnceLock::new();
 
 /// The resolved config directory, combining custom override or platform defaults.
 /// This is set once and cached for subsequent calls.
-/// On macOS, this is `~/.config/zed`.
-/// On Linux/FreeBSD, this is `$XDG_CONFIG_HOME/zed`.
-/// On Windows, this is `%APPDATA%\Zed`.
+/// On macOS, this is `~/.config/kurocto`.
+/// On Linux/FreeBSD, this is `$XDG_CONFIG_HOME/kurocto`.
+/// On Windows, this is `%APPDATA%\Kurocto`.
 static CONFIG_DIR: OnceLock<PathBuf> = OnceLock::new();
 
-/// Returns the relative path to the zed_server directory on the ssh host.
+/// Returns the relative path to the kurocto_server directory on the ssh host.
 pub fn remote_server_dir_relative() -> &'static RelPath {
     static CACHED: LazyLock<&'static RelPath> =
-        LazyLock::new(|| RelPath::from_unix_str(".zed_server").unwrap());
+        LazyLock::new(|| RelPath::from_unix_str(".kurocto_server").unwrap());
     *CACHED
 }
 
 // Remove this once 223 goes stable
-/// Returns the relative path to the zed_wsl_server directory on the wsl host.
+/// Returns the relative path to the kurocto_wsl_server directory on the wsl host.
 pub fn remote_wsl_server_dir_relative() -> &'static RelPath {
     static CACHED: LazyLock<&'static RelPath> =
-        LazyLock::new(|| RelPath::from_unix_str(".zed_wsl_server").unwrap());
+        LazyLock::new(|| RelPath::from_unix_str(".kurocto_wsl_server").unwrap());
     *CACHED
 }
 
@@ -242,13 +242,13 @@ pub fn remote_server_state_dir() -> &'static PathBuf {
     REMOTE_SERVER_STATE.get_or_init(|| data_dir().join("server_state"))
 }
 
-/// Returns the path to the `Zed.log` file.
+/// Returns the path to the `Kurocto.log` file.
 pub fn log_file() -> &'static PathBuf {
     static LOG_FILE: OnceLock<PathBuf> = OnceLock::new();
     LOG_FILE.get_or_init(|| logs_dir().join(format!("{}.log", APP_NAME)))
 }
 
-/// Returns the path to the `Zed.log.old` file.
+/// Returns the path to the `Kurocto.log.old` file.
 pub fn old_log_file() -> &'static PathBuf {
     static OLD_LOG_FILE: OnceLock<PathBuf> = OnceLock::new();
     OLD_LOG_FILE.get_or_init(|| logs_dir().join(format!("{}.log.old", APP_NAME)))
@@ -628,4 +628,64 @@ pub fn global_gitignore_path() -> Option<PathBuf> {
     GLOBAL_GITIGNORE_PATH
         .get_or_init(::ignore::gitignore::gitconfig_excludes_path)
         .clone()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_application_directories_are_named_after_kurocto() {
+        assert_eq!(APP_NAME, "Kurocto");
+        assert_eq!(APP_NAME_LOWERCASE, "kurocto");
+
+        let directories = [
+            config_dir(),
+            data_dir(),
+            state_dir(),
+            temp_dir(),
+            logs_dir(),
+            log_file(),
+            old_log_file(),
+        ];
+        for directory in directories {
+            // Only the trailing components are owned by the application; the
+            // leading ones come from the user's home directory.
+            let owned_components: Vec<String> = directory
+                .components()
+                .rev()
+                .take(2)
+                .map(|component| component.as_os_str().to_string_lossy().into_owned())
+                .collect();
+            assert!(
+                owned_components.iter().any(|component| {
+                    component == APP_NAME
+                        || component == APP_NAME_LOWERCASE
+                        || component.starts_with("Kurocto.log")
+                }),
+                "{directory:?}"
+            );
+            assert!(
+                !owned_components
+                    .iter()
+                    .any(|component| component.to_lowercase().starts_with("zed")),
+                "{directory:?}"
+            );
+        }
+
+        assert!(log_file().ends_with("Kurocto.log"));
+        assert!(old_log_file().ends_with("Kurocto.log.old"));
+    }
+
+    #[test]
+    fn test_remote_server_directories_are_named_after_kurocto() {
+        assert_eq!(
+            remote_server_dir_relative().as_unix_str(),
+            ".kurocto_server"
+        );
+        assert_eq!(
+            remote_wsl_server_dir_relative().as_unix_str(),
+            ".kurocto_wsl_server"
+        );
+    }
 }

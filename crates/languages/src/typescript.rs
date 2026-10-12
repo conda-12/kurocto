@@ -830,7 +830,7 @@ impl LspAdapter for TypeScriptLspAdapter {
         let tsdk_path = self.tsdk_path(adapter).await;
         Ok(Some(json!({
             "provideFormatter": true,
-            "hostInfo": "zed",
+            "hostInfo": "kurocto",
             "tsserver": {
                 "path": tsdk_path,
             },

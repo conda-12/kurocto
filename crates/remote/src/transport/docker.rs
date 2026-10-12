@@ -224,7 +224,7 @@ impl DockerExecConnection {
             _ => version.to_string(),
         };
         let binary_name = format!(
-            "zed-remote-server-{}-{}",
+            "kurocto-remote-server-{}-{}",
             release_channel.dev_name(),
             version_str
         );
@@ -912,13 +912,13 @@ mod tests {
                 connection.docker_cli(),
                 "exec",
                 &args,
-                "sh: 1: /usr/local/cargo/bin/zed-remote-server: not found\nGH_TOKEN=ghp_supersecret run",
+                "sh: 1: /usr/local/cargo/bin/kurocto-remote-server: not found\nGH_TOKEN=ghp_supersecret run",
             ),
             concat!(
                 "failed to run command \"docker\" \"exec\" \"-u\" \"user\"",
                 " \"-e\" \"API_KEY=<redacted>\" \"-e\" \"COMMAND_SECRET=<redacted>\"",
                 " \"container_id\" \"sh\" \"-c\" \"echo hi\"",
-                ": sh: 1: /usr/local/cargo/bin/zed-remote-server: not found\nGH_TOKEN=\"[REDACTED]\" run"
+                ": sh: 1: /usr/local/cargo/bin/kurocto-remote-server: not found\nGH_TOKEN=\"[REDACTED]\" run"
             )
         );
     }

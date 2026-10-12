@@ -130,7 +130,7 @@ fn prompt_for_etw_output_path(cx: &mut App) {
         }
     }
 
-    let save_dialog = cx.prompt_for_new_path(&PathBuf::default(), Some("zed-trace.etl"));
+    let save_dialog = cx.prompt_for_new_path(&PathBuf::default(), Some("kurocto-trace.etl"));
     cx.spawn(async move |cx| {
         let picked = save_dialog.await.unwrap_or(Ok(None));
         cx.update(|cx| match picked {
@@ -237,7 +237,7 @@ fn start_etw_recording(cx: &mut App, heap_pid: Option<u32>) {
     .detach();
 }
 
-const INSTANCE_NAME: &str = "Zed";
+const INSTANCE_NAME: &str = "Kurocto";
 
 const BUILTIN_PROFILES: &[&str] = &[
     "CPU.Verbose.Memory",
@@ -251,7 +251,7 @@ fn heap_tracing_profile(heap_pid: Option<u32>) -> String {
         Some(pid) => (
             format!(
                 r#"
-    <HeapEventProvider Id="ZedHeapProvider">
+    <HeapEventProvider Id="KuroctoHeapProvider">
       <HeapProcessIds Operation="Set">
         <HeapProcessId Value="{pid}"/>
       </HeapProcessIds>
@@ -261,7 +261,7 @@ fn heap_tracing_profile(heap_pid: Option<u32>) -> String {
       <Collectors Operation="Add">
         <HeapEventCollectorId Value="HeapCollector_WPRHeapCollector">
           <HeapEventProviders Operation="Set">
-            <HeapEventProviderId Value="ZedHeapProvider"/>
+            <HeapEventProviderId Value="KuroctoHeapProvider"/>
           </HeapEventProviders>
         </HeapEventCollectorId>
       </Collectors>"#
@@ -272,11 +272,11 @@ fn heap_tracing_profile(heap_pid: Option<u32>) -> String {
 
     format!(
         r#"<?xml version="1.0" encoding="utf-8"?>
-<WindowsPerformanceRecorder Version="1.0" Author="Zed Industries">
+<WindowsPerformanceRecorder Version="1.0" Author="Kurocto contributors">
   <Profiles>
     {heap_provider}
 
-    <Profile Id="ZedHeap.Verbose.Memory" Base="Heap.Verbose.Memory" Name="ZedHeap" DetailLevel="Verbose" LoggingMode="Memory" Description="Heap tracing">
+    <Profile Id="KuroctoHeap.Verbose.Memory" Base="Heap.Verbose.Memory" Name="KuroctoHeap" DetailLevel="Verbose" LoggingMode="Memory" Description="Heap tracing">
       {heap_collector}
     </Profile>
   </Profiles>
@@ -439,7 +439,7 @@ fn build_profile_collection(heap_pid: Option<u32>) -> Result<IProfileCollection>
         collection
             .Add(&heap_profile, VARIANT_BOOL(0))
             .wpr_context(&collection)
-            .context("Add ZedHeap profile to collection")?;
+            .context("Add KuroctoHeap profile to collection")?;
     }
 
     Ok(collection)

@@ -607,7 +607,7 @@ mod tests {
     #[test]
     fn test_supplied_server_binary_requires_existing_path() -> Result<()> {
         let directory = tempfile::tempdir()?;
-        let binary_path = directory.path().join("zed-remote-server.gz");
+        let binary_path = directory.path().join("kurocto-remote-server.gz");
         std::fs::write(&binary_path, b"binary")?;
 
         assert_eq!(
@@ -625,8 +625,8 @@ mod tests {
     #[test]
     fn test_select_server_binary() -> Result<()> {
         let destination_path =
-            RelPath::from_unix_str(".zed_server/zed-remote-server-stable-1.0.0")?;
-        let local_binary = PathBuf::from("/tmp/zed-remote-server.gz");
+            RelPath::from_unix_str(".kurocto_server/kurocto-remote-server-stable-1.0.0")?;
+        let local_binary = PathBuf::from("/tmp/kurocto-remote-server.gz");
 
         assert_eq!(
             select_server_binary(
@@ -656,7 +656,7 @@ mod tests {
     #[test]
     fn test_select_server_binary_reports_how_to_supply_a_binary() -> Result<()> {
         let destination_path =
-            RelPath::from_unix_str(".zed_server/zed-remote-server-stable-1.0.0")?;
+            RelPath::from_unix_str(".kurocto_server/kurocto-remote-server-stable-1.0.0")?;
 
         let Err(error) = select_server_binary(None, false, &LINUX_PLATFORM, destination_path)
         else {
@@ -665,7 +665,7 @@ mod tests {
         let message = error.to_string();
 
         assert!(
-            message.contains("zed-remote-server-stable-1.0.0"),
+            message.contains("kurocto-remote-server-stable-1.0.0"),
             "{message}"
         );
         assert!(message.contains("linux x86_64"), "{message}");

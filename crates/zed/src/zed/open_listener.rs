@@ -58,7 +58,7 @@ pub enum OpenRequestKind {
         external_source_prompt: Option<ExternalSourcePrompt>,
     },
     InstallSkill {
-        /// Full `SKILL.md` contents embedded in a `zed://skill` share link.
+        /// Full `SKILL.md` contents embedded in a `kurocto://skill` share link.
         content: String,
     },
     DockMenuAction {
@@ -119,6 +119,19 @@ impl std::fmt::Debug for OpenRequestKind {
     }
 }
 
+const APP_LINK_PREFIX: &str = "kurocto://";
+// `zed://` is no longer registered with the operating system, but a link in
+// that form is still understood when it is passed explicitly, so that links
+// written for upstream Zed keep working.
+const LEGACY_APP_LINK_PREFIX: &str = "zed://";
+
+fn canonical_app_link(url: String) -> String {
+    match url.strip_prefix(LEGACY_APP_LINK_PREFIX) {
+        Some(link) => format!("{APP_LINK_PREFIX}{link}"),
+        None => url,
+    }
+}
+
 impl OpenRequest {
     pub fn is_focus_app_only(&self) -> bool {
         matches!(self.kind, Some(OpenRequestKind::FocusApp))
@@ -150,42 +163,43 @@ impl OpenRequest {
         }
 
         for url in request.urls {
-            if let Some(server_name) = url.strip_prefix("zed-cli://") {
+            let url = canonical_app_link(url);
+            if let Some(server_name) = url.strip_prefix("kurocto-cli://") {
                 this.kind = Some(OpenRequestKind::CliConnection(connect_to_cli(server_name)?));
-            } else if let Some(action_index) = url.strip_prefix("zed-dock-action://") {
+            } else if let Some(action_index) = url.strip_prefix("kurocto-dock-action://") {
                 this.kind = Some(OpenRequestKind::DockMenuAction {
                     index: action_index.parse()?,
                 });
             } else if let Some(file) = url.strip_prefix("file://") {
                 this.parse_file_path(file)
-            } else if let Some(file) = url.strip_prefix("zed://file") {
+            } else if let Some(file) = url.strip_prefix("kurocto://file") {
                 this.parse_file_path(file)
-            } else if let Some(file) = url.strip_prefix("zed://ssh") {
+            } else if let Some(file) = url.strip_prefix("kurocto://ssh") {
                 let ssh_url = "ssh:/".to_string() + file;
                 this.parse_ssh_file_path(&ssh_url, cx)?
-            } else if let Some(extension_id) = url.strip_prefix("zed://extension/") {
+            } else if let Some(extension_id) = url.strip_prefix("kurocto://extension/") {
                 this.kind = Some(OpenRequestKind::Extension {
                     extension_id: extension_id.to_string(),
                 });
             } else if url.starts_with(agent_skills::SKILL_SHARE_LINK_PREFIX) {
                 this.parse_skill_install_url(&url)?
-            } else if let Some(agent_path) = url.strip_prefix("zed://agent") {
+            } else if let Some(agent_path) = url.strip_prefix("kurocto://agent") {
                 this.parse_agent_url(agent_path)
-            } else if url == "zed://" || url == "zed://open" || url == "zed://open/" {
+            } else if url == "kurocto://" || url == "kurocto://open" || url == "kurocto://open/" {
                 this.kind = Some(OpenRequestKind::FocusApp);
-            } else if let Some(schema_path) = url.strip_prefix("zed://schemas/") {
+            } else if let Some(schema_path) = url.strip_prefix("kurocto://schemas/") {
                 this.kind = Some(OpenRequestKind::BuiltinJsonSchema {
                     schema_path: schema_path.to_string(),
                 });
-            } else if url == "zed://settings" || url == "zed://settings/" {
+            } else if url == "kurocto://settings" || url == "kurocto://settings/" {
                 this.kind = Some(OpenRequestKind::Setting { setting_path: None });
-            } else if let Some(setting_path) = url.strip_prefix("zed://settings/") {
+            } else if let Some(setting_path) = url.strip_prefix("kurocto://settings/") {
                 this.kind = Some(OpenRequestKind::Setting {
                     setting_path: Some(setting_path.to_string()),
                 });
-            } else if let Some(clone_path) = url.strip_prefix("zed://git/clone") {
+            } else if let Some(clone_path) = url.strip_prefix("kurocto://git/clone") {
                 this.parse_git_clone_url(clone_path)?
-            } else if let Some(commit_path) = url.strip_prefix("zed://git/commit/") {
+            } else if let Some(commit_path) = url.strip_prefix("kurocto://git/commit/") {
                 this.parse_git_commit_url(commit_path)?
             } else if url.starts_with("ssh://") {
                 this.parse_ssh_file_path(&url, cx)?
@@ -217,7 +231,7 @@ impl OpenRequest {
     }
 
     fn parse_skill_install_url(&mut self, url: &str) -> Result<()> {
-        // Format: zed://skill?data=<base64url of SKILL.md contents>
+        // Format: kurocto://skill?data=<base64url of SKILL.md contents>
         let content = agent_skills::decode_skill_share_link(url)?;
         self.kind = Some(OpenRequestKind::InstallSkill { content });
         Ok(())
@@ -393,7 +407,7 @@ pub fn listen_for_cli_connections(opener: OpenListener) -> Result<()> {
     use release_channel::RELEASE_CHANNEL_NAME;
     use std::os::unix::net::UnixDatagram;
 
-    let sock_path = paths::data_dir().join(format!("zed-{}.sock", *RELEASE_CHANNEL_NAME));
+    let sock_path = paths::data_dir().join(format!("kurocto-{}.sock", *RELEASE_CHANNEL_NAME));
     // remove the socket if the process listening on it has died
     if let Err(e) = UnixDatagram::unbound()?.connect(&sock_path)
         && e.kind() == std::io::ErrorKind::ConnectionRefused
@@ -1453,13 +1467,126 @@ mod tests {
     }
 
     #[gpui::test]
+    fn test_parse_application_links_for_current_and_legacy_scheme(cx: &mut TestAppContext) {
+        let _app_state = init_test(cx);
+
+        let skill_content =
+            "---\nname: my-skill\ndescription: Does a thing.\n---\n\nDo the thing.\n".to_string();
+        let skill_link = agent_skills::encode_skill_share_link(&skill_content);
+        let skill_link_suffix = skill_link
+            .strip_prefix("kurocto://")
+            .expect("skill share links should use the kurocto scheme")
+            .to_string();
+
+        for scheme in ["kurocto", "zed"] {
+            let parse = |link: &str, cx: &mut TestAppContext| {
+                let url = format!("{scheme}://{link}");
+                cx.update(|cx| {
+                    OpenRequest::parse(
+                        RawOpenRequest {
+                            urls: vec![url.clone()],
+                            ..Default::default()
+                        },
+                        cx,
+                    )
+                })
+                .unwrap_or_else(|error| panic!("failed to parse {url}: {error}"))
+            };
+
+            let request = parse("file/tmp/some%20file.txt", cx);
+            assert_eq!(request.open_paths, vec!["/tmp/some file.txt".to_string()]);
+
+            let request = parse("ssh/user@example.com/home/user/project", cx);
+            assert!(
+                request.remote_connection.is_some(),
+                "expected a remote connection for {scheme}://ssh"
+            );
+
+            let request = parse("extension/some-extension", cx);
+            assert!(matches!(
+                request.kind,
+                Some(OpenRequestKind::Extension { ref extension_id }) if extension_id == "some-extension"
+            ));
+
+            let request = parse("agent", cx);
+            assert!(matches!(
+                request.kind,
+                Some(OpenRequestKind::AgentPanel { .. })
+            ));
+
+            for link in ["", "open", "open/"] {
+                let request = parse(link, cx);
+                assert!(matches!(request.kind, Some(OpenRequestKind::FocusApp)));
+            }
+
+            let request = parse("schemas/settings", cx);
+            assert!(matches!(
+                request.kind,
+                Some(OpenRequestKind::BuiltinJsonSchema { ref schema_path }) if schema_path == "settings"
+            ));
+
+            let request = parse("settings", cx);
+            assert!(matches!(
+                request.kind,
+                Some(OpenRequestKind::Setting { setting_path: None })
+            ));
+
+            let request = parse("settings/theme", cx);
+            assert!(matches!(
+                request.kind,
+                Some(OpenRequestKind::Setting { setting_path: Some(ref setting_path) })
+                    if setting_path == "theme"
+            ));
+
+            let request = parse("git/clone?repo=https://example.com/repository.git", cx);
+            assert!(matches!(
+                request.kind,
+                Some(OpenRequestKind::GitClone { ref repo_url })
+                    if repo_url == "https://example.com/repository.git"
+            ));
+
+            let request = parse("git/commit/abc123?repo=path/to/repo", cx);
+            assert!(matches!(
+                request.kind,
+                Some(OpenRequestKind::GitCommit { ref sha }) if sha == "abc123"
+            ));
+
+            let request = parse(&skill_link_suffix, cx);
+            assert!(matches!(
+                request.kind,
+                Some(OpenRequestKind::InstallSkill { ref content }) if *content == skill_content
+            ));
+        }
+    }
+
+    #[test]
+    fn test_canonical_app_link_only_rewrites_the_legacy_scheme() {
+        assert_eq!(
+            canonical_app_link("zed://file/tmp/file.txt".to_string()),
+            "kurocto://file/tmp/file.txt"
+        );
+        assert_eq!(
+            canonical_app_link("kurocto://settings/theme".to_string()),
+            "kurocto://settings/theme"
+        );
+        assert_eq!(
+            canonical_app_link("file:///tmp/zed://file".to_string()),
+            "file:///tmp/zed://file"
+        );
+        assert_eq!(
+            canonical_app_link("zed-cli://server".to_string()),
+            "zed-cli://server"
+        );
+    }
+
+    #[gpui::test]
     fn test_parse_agent_url(cx: &mut TestAppContext) {
         let _app_state = init_test(cx);
 
         let request = cx.update(|cx| {
             OpenRequest::parse(
                 RawOpenRequest {
-                    urls: vec!["zed://agent".into()],
+                    urls: vec!["kurocto://agent".into()],
                     ..Default::default()
                 },
                 cx,
@@ -1513,7 +1640,7 @@ mod tests {
         let result = cx.update(|cx| {
             OpenRequest::parse(
                 RawOpenRequest {
-                    urls: vec!["zed://skill?data=!!!notbase64".into()],
+                    urls: vec!["kurocto://skill?data=!!!notbase64".into()],
                     ..Default::default()
                 },
                 cx,
@@ -1524,7 +1651,7 @@ mod tests {
     }
 
     fn agent_url_with_prompt(prompt: &str) -> String {
-        let mut serializer = url::form_urlencoded::Serializer::new("zed://agent?".to_string());
+        let mut serializer = url::form_urlencoded::Serializer::new("kurocto://agent?".to_string());
         serializer.append_pair("prompt", prompt);
         serializer.finish()
     }
@@ -1567,7 +1694,7 @@ mod tests {
         let request = cx.update(|cx| {
             OpenRequest::parse(
                 RawOpenRequest {
-                    urls: vec!["zed://agent/?prompt=hello".into()],
+                    urls: vec!["kurocto://agent/?prompt=hello".into()],
                     ..Default::default()
                 },
                 cx,
@@ -1594,7 +1721,7 @@ mod tests {
     fn test_parse_focus_app_url(cx: &mut TestAppContext) {
         let _app_state = init_test(cx);
 
-        for url in ["zed://", "zed://open", "zed://open/"] {
+        for url in ["kurocto://", "kurocto://open", "kurocto://open/"] {
             let request = cx.update(|cx| {
                 OpenRequest::parse(
                     RawOpenRequest {
@@ -1650,7 +1777,7 @@ mod tests {
         let request = cx.update(|cx| {
             OpenRequest::parse(
                 RawOpenRequest {
-                    urls: vec!["zed://git/commit/abc123?repo=path/to/repo".into()],
+                    urls: vec!["kurocto://git/commit/abc123?repo=path/to/repo".into()],
                     ..Default::default()
                 },
                 cx,
@@ -1671,7 +1798,7 @@ mod tests {
         let request = cx.update(|cx| {
             OpenRequest::parse(
                 RawOpenRequest {
-                    urls: vec!["zed://git/commit/def456?repo=path%20with%20spaces".into()],
+                    urls: vec!["kurocto://git/commit/def456?repo=path%20with%20spaces".into()],
                     ..Default::default()
                 },
                 cx,
@@ -1692,7 +1819,7 @@ mod tests {
             assert!(
                 OpenRequest::parse(
                     RawOpenRequest {
-                        urls: vec!["zed://git/commit/abc123?repo=".into()],
+                        urls: vec!["kurocto://git/commit/abc123?repo=".into()],
                         ..Default::default()
                     },
                     cx,
@@ -1707,7 +1834,7 @@ mod tests {
         let result = cx.update(|cx| {
             OpenRequest::parse(
                 RawOpenRequest {
-                    urls: vec!["zed://git/commit/abc123?foo=bar".into()],
+                    urls: vec!["kurocto://git/commit/abc123?foo=bar".into()],
                     ..Default::default()
                 },
                 cx,
@@ -2069,7 +2196,8 @@ mod tests {
             OpenRequest::parse(
                 RawOpenRequest {
                     urls: vec![
-                        "zed://git/clone/?repo=https://github.com/zed-industries/zed.git".into(),
+                        "kurocto://git/clone/?repo=https://github.com/zed-industries/zed.git"
+                            .into(),
                     ],
                     ..Default::default()
                 },
@@ -2094,7 +2222,7 @@ mod tests {
             OpenRequest::parse(
                 RawOpenRequest {
                     urls: vec![
-                        "zed://git/clone?repo=https://github.com/zed-industries/zed.git".into(),
+                        "kurocto://git/clone?repo=https://github.com/zed-industries/zed.git".into(),
                     ],
                     ..Default::default()
                 },
@@ -2119,7 +2247,7 @@ mod tests {
             OpenRequest::parse(
                 RawOpenRequest {
                     urls: vec![
-                        "zed://git/clone/?repo=https%3A%2F%2Fgithub.com%2Fzed-industries%2Fzed.git"
+                        "kurocto://git/clone/?repo=https%3A%2F%2Fgithub.com%2Fzed-industries%2Fzed.git"
                             .into(),
                     ],
                     ..Default::default()

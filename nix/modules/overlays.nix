@@ -6,6 +6,6 @@
       mkZed = import ../toolchain.nix { inherit inputs; };
     in
     {
-      zed-editor = mkZed final;
+      kurocto-editor = mkZed final;
     };
 }

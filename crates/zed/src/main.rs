@@ -169,7 +169,7 @@ fn fail_to_open_window(e: anyhow::Error, _cx: &mut App) {
                 process::exit(1);
             };
 
-            let notification_id = "dev.zed.Oops";
+            let notification_id = "dev.kurocto.Oops";
             proxy
                 .add_notification(
                     notification_id,
@@ -492,12 +492,7 @@ fn main() {
         zed::watch_settings_files(fs.clone(), cx);
         handle_keymap_file_changes(user_keymap_file_rx, user_keymap_watcher, cx);
 
-        let user_agent = format!(
-            "Zed/{} ({}; {})",
-            AppVersion::global(cx),
-            std::env::consts::OS,
-            std::env::consts::ARCH
-        );
+        let user_agent = user_agent(&AppVersion::global(cx));
         let proxy_url = ProxySettings::get_global(cx).proxy_url();
         let http = {
             let _guard = Tokio::handle(cx).enter();
@@ -1546,7 +1541,7 @@ struct Args {
     /// Use `path:line:row` syntax to open a file at a specific location.
     /// Non-existing paths and directories will ignore `:line:row` suffix.
     ///
-    /// URLs can either be `file://` or `zed://` scheme, or relative to <https://zed.dev>.
+    /// URLs can either be `file://` or `kurocto://` scheme, or relative to <https://zed.dev>.
     paths_or_urls: Vec<String>,
 
     /// Pairs of file paths to diff. Can be specified multiple times.
@@ -1557,9 +1552,9 @@ struct Args {
     /// Sets a custom directory for all user data (e.g., database, extensions, logs).
     ///
     /// This overrides the default platform-specific data directory location.
-    /// On macOS, the default is `~/Library/Application Support/Zed`.
-    /// On Linux/FreeBSD, the default is `$XDG_DATA_HOME/zed`.
-    /// On Windows, the default is `%LOCALAPPDATA%\Zed`.
+    /// On macOS, the default is `~/Library/Application Support/Kurocto`.
+    /// On Linux/FreeBSD, the default is `$XDG_DATA_HOME/kurocto`.
+    /// On Windows, the default is `%LOCALAPPDATA%\Kurocto`.
     #[arg(long, value_name = "DIR", verbatim_doc_comment)]
     user_data_dir: Option<String>,
 
@@ -1642,13 +1637,23 @@ struct Args {
     etw_socket: Option<PathBuf>,
 }
 
+fn user_agent(app_version: &semver::Version) -> String {
+    format!(
+        "Kurocto/{} ({}; {})",
+        app_version,
+        std::env::consts::OS,
+        std::env::consts::ARCH
+    )
+}
+
 fn parse_url_arg(arg: &str) -> String {
     match std::fs::canonicalize(Path::new(&arg)) {
         Ok(path) => format!("file://{}", path.display()),
         Err(_) => {
             if arg.starts_with("file://")
+                || arg.starts_with("kurocto://")
                 || arg.starts_with("zed://")
-                || arg.starts_with("zed-cli://")
+                || arg.starts_with("kurocto-cli://")
                 || arg.starts_with("ssh://")
             {
                 arg.into()
@@ -1906,5 +1911,30 @@ fn check_for_conpty_dll() {
         }
     } else {
         log::warn!("Failed to load conpty.dll. Terminal will work with reduced functionality.");
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_user_agent_identifies_kurocto() {
+        let user_agent = user_agent(&semver::Version::new(1, 2, 3));
+        assert!(user_agent.starts_with("Kurocto/1.2.3 ("), "{user_agent}");
+        assert!(!user_agent.contains("Zed"), "{user_agent}");
+    }
+
+    #[test]
+    fn test_parse_url_arg_keeps_application_links() {
+        for url in [
+            "kurocto://settings/theme",
+            "kurocto-cli://server",
+            "zed://file/tmp/file.txt",
+            "ssh://example.com/project",
+            "file:///tmp/file.txt",
+        ] {
+            assert_eq!(parse_url_arg(url), url);
+        }
     }
 }
