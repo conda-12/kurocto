@@ -33,11 +33,6 @@ message OpenBufferByPath {
   string path = 3;
 }
 
-message OpenBufferById {
-  uint64 project_id = 1;
-  uint64 id = 2;
-}
-
 message UpdateBufferFile {
   uint64 project_id = 1;
   uint64 buffer_id = 2;
@@ -80,20 +75,6 @@ message ReloadBuffers {
 
 message ReloadBuffersResponse {
   ProjectTransaction transaction = 1;
-}
-
-message SynchronizeBuffers {
-  uint64 project_id = 1;
-  repeated BufferVersion buffers = 2;
-}
-
-message SynchronizeBuffersResponse {
-  repeated BufferVersion buffers = 1;
-}
-
-message BufferVersion {
-  uint64 id = 1;
-  repeated VectorClockEntry version = 2;
 }
 
 message BufferState {
@@ -214,11 +195,6 @@ message Selection {
 message EditorAnchor {
   optional uint64 excerpt_id = 1;
   Anchor anchor = 2;
-}
-
-message PathKey {
-  optional uint64 sort_prefix = 1;
-  string path = 2;
 }
 
 enum CursorShape {

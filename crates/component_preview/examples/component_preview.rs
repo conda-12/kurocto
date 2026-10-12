@@ -5,7 +5,7 @@ use assets::Assets;
 use fs::RealFs;
 use gpui::{AppContext as _, Bounds, KeyBinding, WindowBounds, WindowOptions, actions, size};
 
-use client::{Client, UserStore};
+use client::Client;
 use language::LanguageRegistry;
 use node_runtime::NodeRuntime;
 use project::Project;
@@ -53,8 +53,7 @@ fn main() {
         let languages = Arc::new(LanguageRegistry::new(cx.background_executor().clone()));
         let client = Client::production(cx);
 
-        let user_store = cx.new(|cx| UserStore::new(client.clone(), cx));
-        let workspace_store = cx.new(|cx| WorkspaceStore::new(client.clone(), cx));
+        let workspace_store = cx.new(|_| WorkspaceStore::default());
         let session_id = uuid::Uuid::new_v4().to_string();
         let kvp = db::kvp::KeyValueStore::global(cx);
         let session = cx
@@ -66,7 +65,6 @@ fn main() {
         let app_state = Arc::new(AppState {
             languages,
             client,
-            user_store,
             workspace_store,
             fs,
             build_window_options: |_, _| Default::default(),
@@ -95,7 +93,6 @@ fn main() {
                     let project = Project::local(
                         app_state.client.clone(),
                         app_state.node_runtime.clone(),
-                        app_state.user_store.clone(),
                         app_state.languages.clone(),
                         app_state.fs.clone(),
                         None,
@@ -119,14 +116,12 @@ fn main() {
                     workspace.update(cx, |workspace, cx| {
                         let weak_workspace = cx.entity().downgrade();
                         let language_registry = app_state.languages.clone();
-                        let user_store = app_state.user_store.clone();
 
                         let component_preview = cx.new(|cx| {
                             ComponentPreview::new(
                                 weak_workspace,
                                 project,
                                 language_registry,
-                                user_store,
                                 None,
                                 None,
                                 window,

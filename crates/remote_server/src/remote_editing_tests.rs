@@ -7,7 +7,7 @@ use agent::{
     SkillToolInput, SkillToolOutput, Templates, ThreadStore, ToolCallEventStream, ToolInput,
     skill_body_resolver_for_project, skills_resolver_for_project,
 };
-use client::{Client, UserStore};
+use client::Client;
 use clock::FakeSystemClock;
 use collections::{HashMap, HashSet};
 use language_model::{LanguageModelRegistry, LanguageModelToolResultContent};
@@ -670,7 +670,7 @@ async fn test_remote_project_search_backpressure_survives_cancellation(
                 .buffers()
                 .filter_map(|buffer| {
                     let id = buffer.read(cx).remote_id();
-                    store.is_shared(id, cx).then_some(id)
+                    store.is_shared(id).then_some(id)
                 })
                 .collect::<Vec<_>>();
             ids.sort();
@@ -782,7 +782,7 @@ async fn test_remote_project_search_limits_unacknowledged_bytes(
             let store = headless.buffer_store.read(cx);
             store
                 .buffers()
-                .filter(|buffer| store.is_shared(buffer.read(cx).remote_id(), cx))
+                .filter(|buffer| store.is_shared(buffer.read(cx).remote_id()))
                 .map(|buffer| buffer.read(cx).len())
                 .sum::<usize>()
         })
@@ -5888,7 +5888,7 @@ async fn test_remote_project_creation_notifies_new_entity_observers(
 }
 
 #[gpui::test]
-async fn test_remote_log_streams_follow_aggregate_demand(
+async fn test_remote_log_stream_follows_view_demand(
     cx: &mut TestAppContext,
     server_cx: &mut TestAppContext,
 ) {
@@ -5938,7 +5938,6 @@ async fn test_remote_log_streams_follow_aggregate_demand(
         );
     });
 
-    let peer_id = proto::PeerId { owner_id: 1, id: 1 };
     local_log_store.update(cx, |log_store, cx| {
         log_store.retain_view_log_stream(&remote_server_key, LogKind::Rpc, cx);
     });
@@ -5950,219 +5949,6 @@ async fn test_remote_log_streams_follow_aggregate_demand(
             .get(&headless_server_key)
             .is_some_and(|state| state.rpc_state.is_some())
     }));
-
-    project.update(cx, |_, cx| {
-        cx.emit(project::Event::ToggleLspLogs {
-            peer_id,
-            server_id,
-            enabled: true,
-            toggled_log_kind: LogKind::Rpc,
-        });
-    });
-    local_log_store.update(cx, |log_store, cx| {
-        log_store.release_view_log_stream(&remote_server_key, LogKind::Rpc, cx);
-    });
-    cx.run_until_parked();
-    server_cx.run_until_parked();
-    assert!(
-        headless_log_store.read_with(server_cx, |log_store, _| {
-            log_store
-                .language_servers
-                .get(&headless_server_key)
-                .is_some_and(|state| state.rpc_state.is_some())
-        }),
-        "releasing a local view must preserve downstream demand on the remote host"
-    );
-
-    let other_project = Project::test(FakeFs::new(cx.executor()), [], cx).await;
-    local_log_store.update(cx, |log_store, cx| {
-        log_store.add_project(&other_project, cx);
-    });
-    for event in [project::Event::Rejoined, project::Event::HostReshared] {
-        // Forget upstream ownership without changing the remaining downstream demand.
-        headless_log_store.update(server_cx, |log_store, cx| {
-            assert!(
-                log_store
-                    .language_servers
-                    .remove(&headless_server_key)
-                    .is_some()
-            );
-            log_store.add_language_server(
-                headless_server_key.kind.clone(),
-                server_id,
-                None,
-                None,
-                None,
-                cx,
-            );
-        });
-        other_project.update(cx, |_, cx| cx.emit(event.clone()));
-        cx.run_until_parked();
-        server_cx.run_until_parked();
-        assert!(
-            headless_log_store.read_with(server_cx, |log_store, _| {
-                log_store
-                    .language_servers
-                    .get(&headless_server_key)
-                    .is_some_and(|state| state.rpc_state.is_none())
-            }),
-            "reconnecting another project must not replay this project's streams"
-        );
-
-        for _ in 0..2 {
-            project.update(cx, |_, cx| cx.emit(event.clone()));
-            cx.run_until_parked();
-            server_cx.run_until_parked();
-            assert!(
-                headless_log_store.read_with(server_cx, |log_store, _| {
-                    log_store
-                        .language_servers
-                        .get(&headless_server_key)
-                        .is_some_and(|state| state.rpc_state.is_some())
-                }),
-                "{event:?} must replay downstream-only demand without a local view"
-            );
-        }
-    }
-
-    project.update(cx, |_, cx| {
-        cx.emit(project::Event::CollaboratorLeft(peer_id));
-    });
-    cx.run_until_parked();
-    server_cx.run_until_parked();
-    assert!(headless_log_store.read_with(server_cx, |log_store, _| {
-        log_store
-            .language_servers
-            .get(&headless_server_key)
-            .is_some_and(|state| state.rpc_state.is_none())
-    }));
-
-    project.update(cx, |_, cx| {
-        cx.emit(project::Event::ToggleLspLogs {
-            peer_id,
-            server_id,
-            enabled: true,
-            toggled_log_kind: LogKind::Rpc,
-        });
-    });
-    cx.run_until_parked();
-    server_cx.run_until_parked();
-    assert!(
-        headless_log_store.read_with(server_cx, |log_store, _| {
-            log_store
-                .language_servers
-                .get(&headless_server_key)
-                .is_some_and(|state| state.rpc_state.is_some())
-        }),
-        "downstream demand must enable the stream on the remote host"
-    );
-
-    local_log_store.update(cx, |log_store, cx| {
-        log_store.retain_view_log_stream(&remote_server_key, LogKind::Rpc, cx);
-    });
-    project.update(cx, |_, cx| {
-        cx.emit(project::Event::ToggleLspLogs {
-            peer_id,
-            server_id,
-            enabled: false,
-            toggled_log_kind: LogKind::Rpc,
-        });
-    });
-    cx.run_until_parked();
-    server_cx.run_until_parked();
-    assert!(
-        headless_log_store.read_with(server_cx, |log_store, _| {
-            log_store
-                .language_servers
-                .get(&headless_server_key)
-                .is_some_and(|state| state.rpc_state.is_some())
-        }),
-        "releasing downstream demand must preserve a local view on the remote host"
-    );
-
-    local_log_store.update(cx, |log_store, cx| {
-        log_store.release_view_log_stream(&remote_server_key, LogKind::Rpc, cx);
-    });
-    cx.run_until_parked();
-    server_cx.run_until_parked();
-    assert!(headless_log_store.read_with(server_cx, |log_store, _| {
-        log_store
-            .language_servers
-            .get(&headless_server_key)
-            .is_some_and(|state| state.rpc_state.is_none())
-    }));
-    project.update(cx, |_, cx| {
-        cx.emit(project::Event::Rejoined);
-        cx.emit(project::Event::HostReshared);
-    });
-    cx.run_until_parked();
-    server_cx.run_until_parked();
-    assert!(
-        headless_log_store.read_with(server_cx, |log_store, _| {
-            log_store
-                .language_servers
-                .get(&headless_server_key)
-                .is_some_and(|state| state.rpc_state.is_none())
-        }),
-        "reconnecting must not replay streams without any remaining demand"
-    );
-
-    for has_local_view in [false, true] {
-        project
-            .update(cx, |project, cx| project.shared(1, cx))
-            .expect("project should be shareable");
-        if has_local_view {
-            local_log_store.update(cx, |log_store, cx| {
-                log_store.retain_view_log_stream(&remote_server_key, LogKind::Rpc, cx);
-            });
-        }
-        project.update(cx, |_, cx| {
-            cx.emit(project::Event::ToggleLspLogs {
-                peer_id,
-                server_id,
-                enabled: true,
-                toggled_log_kind: LogKind::Rpc,
-            });
-        });
-        cx.run_until_parked();
-        server_cx.run_until_parked();
-        assert!(headless_log_store.read_with(server_cx, |log_store, _| {
-            log_store
-                .language_servers
-                .get(&headless_server_key)
-                .is_some_and(|state| state.rpc_state.is_some())
-        }));
-
-        project
-            .update(cx, |project, cx| project.unshare(cx))
-            .expect("shared project should unshare");
-        cx.run_until_parked();
-        server_cx.run_until_parked();
-        assert_eq!(
-            headless_log_store.read_with(server_cx, |log_store, _| {
-                log_store
-                    .language_servers
-                    .get(&headless_server_key)
-                    .map(|state| state.rpc_state.is_some())
-            }),
-            Some(has_local_view),
-            "unsharing must release downstream demand while preserving local views"
-        );
-
-        if has_local_view {
-            local_log_store.update(cx, |log_store, cx| {
-                log_store.release_view_log_stream(&remote_server_key, LogKind::Rpc, cx);
-            });
-            cx.run_until_parked();
-            server_cx.run_until_parked();
-            assert!(headless_log_store.read_with(server_cx, |log_store, _| {
-                log_store
-                    .language_servers
-                    .get(&headless_server_key)
-                    .is_some_and(|state| state.rpc_state.is_none())
-            }));
-        }
-    }
 }
 
 #[gpui::test]
@@ -6337,13 +6123,12 @@ fn build_project(ssh: Entity<RemoteClient>, cx: &mut TestAppContext) -> Entity<P
     });
 
     let node = NodeRuntime::unavailable();
-    let user_store = cx.new(|cx| UserStore::new(client.clone(), cx));
     let languages = Arc::new(LanguageRegistry::test(cx.executor()));
     let fs = FakeFs::new(cx.executor());
 
     cx.update(|cx| {
-        Project::init(&client, cx);
+        Project::init(cx);
     });
 
-    cx.update(|cx| Project::remote(ssh, client, node, user_store, languages, fs, false, cx))
+    cx.update(|cx| Project::remote(ssh, client, node, languages, fs, false, cx))
 }

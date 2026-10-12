@@ -5911,7 +5911,6 @@ mod tests {
                 "buffer_search",
                 "call_hierarchy",
                 "cli",
-                "collab",
                 "command_palette",
                 "console",
                 "context_server",
@@ -6204,10 +6203,7 @@ mod tests {
             repl::init(app_state.fs.clone(), cx);
             repl::notebook::init(cx);
             tasks_ui::init(cx);
-            project::debugger::breakpoint_store::BreakpointStore::init(
-                &app_state.client.clone().into(),
-            );
-            project::debugger::dap_store::DapStore::init(&app_state.client.clone().into(), cx);
+            project::debugger::dap_store::DapStore::register_locators(cx);
             debugger_ui::init(cx);
             initialize_workspace(app_state.clone(), cx);
             search::init(cx);
@@ -8365,8 +8361,7 @@ mod tests {
                 http_client.clone(),
                 cx,
             );
-            state.user_store = cx.new(|cx| client::UserStore::new(client.clone(), cx));
-            state.workspace_store = cx.new(|cx| workspace::WorkspaceStore::new(client.clone(), cx));
+            state.workspace_store = cx.new(|_| workspace::WorkspaceStore::default());
             state.client = client;
 
             // The full test setup also starts language model and agent

@@ -1700,22 +1700,49 @@ async fn test_nearest_retained_workspace(cx: &mut TestAppContext) {
 }
 
 #[gpui::test]
-async fn test_nearest_retained_workspace_skips_disconnected_workspace(cx: &mut TestAppContext) {
+async fn test_nearest_retained_workspace_skips_disconnected_workspace(
+    cx: &mut TestAppContext,
+    server_cx: &mut TestAppContext,
+) {
     init_test(cx);
+    cx.update(|cx| release_channel::init("0.0.0".parse().expect("valid version"), cx));
     let fs = FakeFs::new(cx.executor());
     fs.insert_tree("/project-a", json!({})).await;
-    fs.insert_tree("/project-b", json!({})).await;
 
     let project_a = Project::test(fs.clone(), ["/project-a".as_ref()], cx).await;
-    let project_b = Project::test(fs, ["/project-b".as_ref()], cx).await;
+    let (connection_options, server_session, connect_guard) =
+        remote::RemoteClient::fake_server(cx, server_cx);
+    let server_entity = server_cx.new(|_| ());
+    server_session.add_request_handler(
+        server_entity.downgrade(),
+        |_: Entity<()>, _: client::TypedEnvelope<client::proto::Ping>, _| async {
+            Ok(client::proto::Ack {})
+        },
+    );
+    drop(connect_guard);
+    let remote_client = remote::RemoteClient::connect_mock(connection_options, cx).await;
+    let project_b = cx.update(|cx| {
+        Project::remote(
+            remote_client.clone(),
+            project_a.read(cx).client(),
+            node_runtime::NodeRuntime::unavailable(),
+            project_a.read(cx).languages().clone(),
+            fs,
+            false,
+            cx,
+        )
+    });
+    project_b.update(cx, |project, cx| {
+        project.add_test_remote_worktree("/project-b", cx);
+    });
     let key_a = project_a.read_with(cx, |project, cx| project.project_group_key(cx));
     let (multi_workspace, cx) = setup_multi_workspace(&[project_a.clone(), project_b.clone()], cx);
 
-    project_b.update(cx, |project, cx| {
-        project.mark_as_collab_for_testing();
-        project.disconnected_from_host(cx);
+    remote_client.update(cx, |remote_client, cx| {
+        remote_client.force_server_not_running(cx);
     });
     cx.run_until_parked();
+    project_b.read_with(cx, |project, cx| assert!(project.is_disconnected(cx)));
 
     multi_workspace.update(cx, |multi_workspace, cx| {
         let group_a_index = multi_workspace

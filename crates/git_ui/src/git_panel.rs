@@ -1215,7 +1215,6 @@ const MAX_PANEL_EDITOR_LINES: usize = 6;
 pub(crate) fn commit_message_editor(
     commit_message_buffer: Entity<Buffer>,
     placeholder: Option<SharedString>,
-    project: Entity<Project>,
     in_panel: bool,
     window: &mut Window,
     cx: &mut Context<Editor>,
@@ -1232,7 +1231,7 @@ pub(crate) fn commit_message_editor(
         window,
         cx,
     );
-    commit_editor.set_collaboration_hub(Box::new(project));
+    commit_editor.set_show_remote_selections(true);
     commit_editor.set_use_autoclose(false);
     commit_editor.set_show_gutter(false, cx);
     commit_editor.set_use_modal_editing(true);
@@ -1393,9 +1392,8 @@ impl GitPanel {
             // just to let us render a placeholder editor.
             // Once the active git repo is set, this buffer will be replaced.
             let temporary_buffer = cx.new(|cx| Buffer::local(initial_commit_message, cx));
-            let commit_editor = cx.new(|cx| {
-                commit_message_editor(temporary_buffer, None, project.clone(), true, window, cx)
-            });
+            let commit_editor =
+                cx.new(|cx| commit_message_editor(temporary_buffer, None, true, window, cx));
 
             let scroll_handle = UniformListScrollHandle::new();
 
@@ -4484,10 +4482,6 @@ impl GitPanel {
         window: &mut Window,
         cx: &mut Context<Self>,
     ) {
-        if !self.can_push_and_pull(cx) {
-            return;
-        }
-
         let Some(repo) = self.active_repository.clone() else {
             return;
         };
@@ -4636,9 +4630,6 @@ impl GitPanel {
     }
 
     pub(crate) fn pull(&mut self, rebase: bool, window: &mut Window, cx: &mut Context<Self>) {
-        if !self.can_push_and_pull(cx) {
-            return;
-        }
         let Some(repo) = self.active_repository.clone() else {
             return;
         };
@@ -4706,9 +4697,6 @@ impl GitPanel {
         window: &mut Window,
         cx: &mut Context<Self>,
     ) {
-        if !self.can_push_and_pull(cx) {
-            return;
-        }
         let Some(repo) = self.active_repository.clone() else {
             return;
         };
@@ -4920,10 +4908,6 @@ impl GitPanel {
                     .ok();
             },
         )
-    }
-
-    fn can_push_and_pull(&self, cx: &App) -> bool {
-        !self.project.read(cx).is_via_collab()
     }
 
     fn start_remote_operation(
@@ -5258,7 +5242,6 @@ impl GitPanel {
                             commit_message_editor(
                                 buffer.clone(),
                                 git_panel.suggest_commit_message(cx).map(SharedString::from),
-                                git_panel.project.clone(),
                                 true,
                                 window,
                                 cx,
@@ -6550,9 +6533,6 @@ impl GitPanel {
 
     pub(crate) fn render_remote_button(&self, cx: &mut Context<Self>) -> Option<AnyElement> {
         let branch = self.active_repository.as_ref()?.read(cx).branch.clone();
-        if !self.can_push_and_pull(cx) {
-            return None;
-        }
         Some(
             h_flex()
                 .gap_1()
@@ -14107,13 +14087,10 @@ mod tests {
     #[gpui::test]
     async fn test_commit_editor_context_menu_clipboard_actions(cx: &mut TestAppContext) {
         init_test(cx);
-        let fs = FakeFs::new(cx.background_executor.clone());
-        let project = Project::test(fs, [], cx).await;
-
         for in_panel in [true, false] {
             let window_handle = cx.add_window(|window, cx| {
                 let buffer = cx.new(|cx| Buffer::local("commit message", cx));
-                commit_message_editor(buffer, None, project.clone(), in_panel, window, cx)
+                commit_message_editor(buffer, None, in_panel, window, cx)
             });
             let editor = window_handle.root(cx).expect("commit editor should exist");
             let cx = &mut VisualTestContext::from_window(window_handle.into(), cx);

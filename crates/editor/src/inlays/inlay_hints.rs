@@ -7321,16 +7321,12 @@ let c = 3;"#
                 );
             })
             .unwrap();
-        assert_eq!(
-            a_requests.load(Ordering::SeqCst),
-            1,
-            "A should be queried once initially"
-        );
-        assert_eq!(
-            b_requests.load(Ordering::SeqCst),
-            1,
-            "B should be queried once initially"
-        );
+        // How often each server is asked while both are starting up depends on the order they
+        // come up in, so the refresh below is checked against these counts.
+        let initial_a_requests = a_requests.load(Ordering::SeqCst);
+        let initial_b_requests = b_requests.load(Ordering::SeqCst);
+        assert!(initial_a_requests >= 1, "A should be queried initially");
+        assert!(initial_b_requests >= 1, "B should be queried initially");
 
         // 2. B-only refresh: still exactly one `hint:`.
         fake_server_b
@@ -7342,12 +7338,12 @@ let c = 3;"#
         cx.executor().run_until_parked();
         assert_eq!(
             b_requests.load(Ordering::SeqCst),
-            2,
+            initial_b_requests + 1,
             "refresh should re-query B"
         );
         assert_eq!(
             a_requests.load(Ordering::SeqCst),
-            1,
+            initial_a_requests,
             "refresh of B must not re-query A"
         );
 

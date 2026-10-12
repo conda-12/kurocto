@@ -117,6 +117,13 @@ pub struct PersistedAdapterOptions {
 
 impl DapStore {
     pub fn init(client: &AnyProtoClient, cx: &mut App) {
+        Self::register_locators(cx);
+        client.add_entity_request_handler(Self::handle_run_debug_locator);
+        client.add_entity_request_handler(Self::handle_get_debug_adapter_binary);
+        client.add_entity_message_handler(Self::handle_log_to_debug_console);
+    }
+
+    pub fn register_locators(cx: &mut App) {
         static ADD_LOCATORS: Once = Once::new();
         ADD_LOCATORS.call_once(|| {
             let registry = DapRegistry::global(cx);
@@ -125,9 +132,6 @@ impl DapStore {
             registry.add_locator(Arc::new(locators::node::NodeLocator));
             registry.add_locator(Arc::new(locators::python::PythonLocator));
         });
-        client.add_entity_request_handler(Self::handle_run_debug_locator);
-        client.add_entity_request_handler(Self::handle_get_debug_adapter_binary);
-        client.add_entity_message_handler(Self::handle_log_to_debug_console);
     }
 
     #[expect(clippy::too_many_arguments)]
@@ -798,12 +802,6 @@ impl DapStore {
         _: &mut Context<Self>,
     ) {
         self.downstream_client = Some((downstream_client, project_id));
-    }
-
-    pub fn unshared(&mut self, cx: &mut Context<Self>) {
-        self.downstream_client.take();
-
-        cx.notify();
     }
 
     async fn handle_run_debug_locator(

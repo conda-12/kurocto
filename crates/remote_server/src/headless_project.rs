@@ -374,7 +374,7 @@ impl HeadlessProject {
                             let (buffer_id, transferred_bytes, transfer) =
                                 buffer_store.update(cx, |store, cx| {
                                     let buffer_id = buffer.read(cx).remote_id();
-                                    let transferred_bytes = if store.is_shared(buffer_id, cx) {
+                                    let transferred_bytes = if store.is_shared(buffer_id) {
                                         0
                                     } else {
                                         buffer.read(cx).len()

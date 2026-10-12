@@ -19,7 +19,7 @@ use agent_ui::AgentPanel;
 use anyhow::{Context as _, Result};
 use clap::Parser;
 use cli::FORCE_CLI_MODE_ENV_VAR_NAME;
-use client::{Client, ProxySettings, UserStore};
+use client::{Client, ProxySettings};
 use collections::HashMap;
 use crashes::InitCrashHandler;
 use db::kvp::KeyValueStore;
@@ -550,8 +550,7 @@ fn main() {
 
         debug_adapter_extension::init(extension_host_proxy.clone(), cx);
         languages::init(languages.clone(), fs.clone(), node_runtime.clone(), cx);
-        let user_store = cx.new(|cx| UserStore::new(client.clone(), cx));
-        let workspace_store = cx.new(|cx| WorkspaceStore::new(client.clone(), cx));
+        let workspace_store = cx.new(|_| WorkspaceStore::default());
 
         language_extension::init(
             language_extension::LspAccess::ViaWorkspaces({
@@ -577,7 +576,7 @@ fn main() {
         zed::init(cx);
         #[cfg(target_os = "macos")]
         zed::move_to_applications::init(cx);
-        project::Project::init(&client, cx);
+        project::Project::init(cx);
         debugger_ui::init(cx);
         debugger_tools::init(cx);
         feature_flags::FeatureFlagStore::init(cx);
@@ -597,7 +596,6 @@ fn main() {
         let app_state = Arc::new(AppState {
             languages,
             client: client.clone(),
-            user_store,
             fs: fs.clone(),
             build_window_options,
             workspace_store,

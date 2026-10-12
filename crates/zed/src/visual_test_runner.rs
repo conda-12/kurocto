@@ -252,7 +252,6 @@ fn run_visual_tests(project_path: PathBuf, update_baseline: bool) -> Result<()> 
         project::Project::local(
             app_state.client.clone(),
             app_state.node_runtime.clone(),
-            app_state.user_store.clone(),
             app_state.languages.clone(),
             app_state.fs.clone(),
             None,
@@ -978,8 +977,7 @@ fn init_app_state(cx: &mut App) -> Arc<AppState> {
     let http_client = http_client::FakeHttpClient::with_404_response();
     let client = client::Client::new(clock, http_client, cx);
     let session = cx.new(|cx| session::AppSession::new(Session::test(), cx));
-    let user_store = cx.new(|cx| client::UserStore::new(client.clone(), cx));
-    let workspace_store = cx.new(|cx| workspace::WorkspaceStore::new(client.clone(), cx));
+    let workspace_store = cx.new(|_| workspace::WorkspaceStore::default());
 
     theme_settings::init(theme::LoadThemes::JustBase, cx);
 
@@ -987,7 +985,6 @@ fn init_app_state(cx: &mut App) -> Arc<AppState> {
         client,
         fs,
         languages,
-        user_store,
         workspace_store,
         node_runtime: NodeRuntime::unavailable(),
         build_window_options: |_, _| Default::default(),
@@ -1039,7 +1036,6 @@ fn run_breakpoint_hover_visual_tests(
         project::Project::local(
             app_state.client.clone(),
             app_state.node_runtime.clone(),
-            app_state.user_store.clone(),
             app_state.languages.clone(),
             app_state.fs.clone(),
             None,
@@ -1311,7 +1307,6 @@ fn run_settings_ui_subpage_visual_tests(
         project::Project::local(
             app_state.client.clone(),
             app_state.node_runtime.clone(),
-            app_state.user_store.clone(),
             app_state.languages.clone(),
             app_state.fs.clone(),
             None,
@@ -1526,7 +1521,6 @@ import { AiPaneTabContext } from 'context';
         project::Project::local(
             app_state.client.clone(),
             app_state.node_runtime.clone(),
-            app_state.user_store.clone(),
             app_state.languages.clone(),
             app_state.fs.clone(),
             None,
@@ -2019,7 +2013,6 @@ fn run_agent_thread_view_test(
         project::Project::local(
             app_state.client.clone(),
             app_state.node_runtime.clone(),
-            app_state.user_store.clone(),
             app_state.languages.clone(),
             app_state.fs.clone(),
             None,
@@ -2356,7 +2349,6 @@ fn run_tool_permissions_visual_tests(
         project::Project::local(
             app_state.client.clone(),
             app_state.node_runtime.clone(),
-            app_state.user_store.clone(),
             app_state.languages.clone(),
             app_state.fs.clone(),
             None,
@@ -2562,7 +2554,6 @@ fn run_multi_workspace_sidebar_visual_tests(
         project::Project::local(
             app_state.client.clone(),
             app_state.node_runtime.clone(),
-            app_state.user_store.clone(),
             app_state.languages.clone(),
             app_state.fs.clone(),
             None,
@@ -2578,7 +2569,6 @@ fn run_multi_workspace_sidebar_visual_tests(
         project::Project::local(
             app_state.client.clone(),
             app_state.node_runtime.clone(),
-            app_state.user_store.clone(),
             app_state.languages.clone(),
             app_state.fs.clone(),
             None,
@@ -3337,7 +3327,6 @@ fn create_project_with_worktree(
         project::Project::local(
             app_state.client.clone(),
             app_state.node_runtime.clone(),
-            app_state.user_store.clone(),
             app_state.languages.clone(),
             app_state.fs.clone(),
             None,

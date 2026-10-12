@@ -1,6 +1,3 @@
-mod notification;
-
-pub use notification::*;
 pub use proto;
 pub use proto::{Receipt, TypedEnvelope, error::*};
 mod macros;

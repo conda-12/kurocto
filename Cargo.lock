@@ -2593,7 +2593,6 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "clock",
- "collections",
  "credentials_provider",
  "fs",
  "futures 0.3.34",
@@ -2613,7 +2612,6 @@ dependencies = [
  "telemetry",
  "telemetry_events",
  "tempfile",
- "text",
  "url",
  "util",
  "windows 0.62.2",
@@ -13443,9 +13441,6 @@ dependencies = [
  "gpui",
  "parking_lot",
  "proto",
- "serde",
- "serde_json",
- "strum",
 ]
 
 [[package]]
