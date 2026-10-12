@@ -24,6 +24,12 @@ echo -n "" >"$OUTPUT_FILE"
     echo -e "\n# ###### ICON LICENSES ######\n"
     cat assets/icons/LICENSES
 
+    echo -e "\n# ###### FONT LICENSES ######\n"
+    echo -e "## IBM Plex Sans\n"
+    cat assets/fonts/ibm-plex-sans/license.txt
+    echo -e "\n## Lilex\n"
+    cat assets/fonts/lilex/OFL.txt
+
     echo -e "\n# ###### CODE LICENSES ######\n"
 } >>"$OUTPUT_FILE"
 

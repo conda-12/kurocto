@@ -3,7 +3,7 @@
 description = "Measures the size of the Zed binary shipped in the Linux bundle"
 
 [step.exec.bundle-linux]
-cmd = "./script/bundle-linux --skip-sentry"
+cmd = "./script/bundle-linux"
 
 [step.exec.extract-bundled-binary]
 cmd = "editor_path=$(tar -tzf target/release/zed-linux-$(uname -m).tar.gz | grep '/libexec/zed-editor$') && tar -xOzf target/release/zed-linux-$(uname -m).tar.gz \"$editor_path\" > target/release/zed-bundled"

@@ -8,11 +8,16 @@ $templateFile="script/licenses/template.md.hbs"
 New-Item -Path "$outputFile" -ItemType File -Value "" -Force
 
 @(
-    "# ###### THEME LICENSES ######\n"
+    "# ###### THEME LICENSES ######`n"
     Get-Content assets/themes/LICENSES
-    "\n# ###### ICON LICENSES ######\n"
+    "`n# ###### ICON LICENSES ######`n"
     Get-Content assets/icons/LICENSES
-    "\n# ###### CODE LICENSES ######\n"
+    "`n# ###### FONT LICENSES ######`n"
+    "## IBM Plex Sans`n"
+    Get-Content assets/fonts/ibm-plex-sans/license.txt
+    "`n## Lilex`n"
+    Get-Content assets/fonts/lilex/OFL.txt
+    "`n# ###### CODE LICENSES ######`n"
 ) | Add-Content -Path $outputFile
 
 $needsInstall = $false
@@ -34,7 +39,7 @@ if ($needsInstall) {
 
 Write-Host "Generating cargo licenses"
 
-$failFlag = $env:ALLOW_MISSING_LICENSES ? "--fail" : ""
+$failFlag = $env:ALLOW_MISSING_LICENSES ? "" : "--fail"
 $args = @('about', 'generate', $failFlag, '-c', 'script/licenses/zed-licenses.toml', $templateFile, '-o', $outputFile) | Where-Object { $_ }
 cargo @args
 
