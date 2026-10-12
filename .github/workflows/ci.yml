@@ -1,9 +1,12 @@
 name: CI
 
+# Changes that touch only Markdown cannot affect any job here, so they do not start a run.
 on:
   push:
     branches: [main]
+    paths-ignore: ["**/*.md"]
   pull_request:
+    paths-ignore: ["**/*.md"]
 
 concurrency:
   group: ci-${{ github.workflow }}-${{ github.ref }}
