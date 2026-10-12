@@ -9,8 +9,8 @@ use anyhow::{Context as _, Result};
 use chrono::Local;
 use collections::{HashMap, HashSet};
 use edit_prediction::{
-    data_collection::format_cursor_excerpt,
     example_spec::ExampleSpec,
+    example_spec::format_cursor_excerpt,
     udiff::{apply_diff_to_string, edits_for_diff},
 };
 use futures::stream::{FuturesUnordered, StreamExt};

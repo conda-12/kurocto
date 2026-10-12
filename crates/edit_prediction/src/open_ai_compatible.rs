@@ -1,10 +1,46 @@
 use anyhow::{Context as _, Result};
-use cloud_llm_client::predict_edits_v3::{RawCompletionRequest, RawCompletionResponse};
 use futures::AsyncReadExt as _;
 use gpui::{App, AppContext as _, Entity, Global, SharedString, Task, http_client};
 use language::language_settings::{OpenAiCompatibleEditPredictionSettings, all_language_settings};
 use language_model::{ApiKeyState, EnvVar, env_var};
-use std::sync::Arc;
+use serde::{Deserialize, Serialize};
+use std::{borrow::Cow, sync::Arc};
+
+#[derive(Debug, Deserialize, Serialize)]
+pub struct RawCompletionRequest {
+    pub model: String,
+    pub prompt: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub max_tokens: Option<u32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub temperature: Option<f32>,
+    pub stop: Vec<Cow<'static, str>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub environment: Option<String>,
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+pub struct RawCompletionResponse {
+    pub id: String,
+    pub object: String,
+    pub created: u64,
+    pub model: String,
+    pub choices: Vec<RawCompletionChoice>,
+    pub usage: RawCompletionUsage,
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+pub struct RawCompletionChoice {
+    pub text: String,
+    pub finish_reason: Option<String>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct RawCompletionUsage {
+    pub prompt_tokens: u32,
+    pub completion_tokens: u32,
+    pub total_tokens: u32,
+}
 
 pub fn open_ai_compatible_api_url(cx: &App) -> SharedString {
     all_language_settings(None, cx)
@@ -87,10 +123,7 @@ pub(crate) async fn send_custom_server_request(
                 prompt,
                 max_tokens: Some(max_tokens),
                 temperature: None,
-                stop: stop_tokens
-                    .into_iter()
-                    .map(std::borrow::Cow::Owned)
-                    .collect(),
+                stop: stop_tokens.into_iter().map(Cow::Owned).collect(),
                 environment: None,
             };
 

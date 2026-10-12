@@ -1,10 +1,9 @@
 use std::{ops::Range, sync::Arc};
 
-use cloud_llm_client::{EditPredictionRejectReason, PredictEditsRequestTrigger};
 use edit_prediction_types::{PredictedCursorPosition, interpolate_edits};
 use gpui::{AsyncApp, Entity, SharedString};
 use language::{Anchor, Buffer, BufferSnapshot, EditPreview, TextBufferSnapshot};
-use zeta_prompt::{Zeta2PromptInput, Zeta3PromptInput};
+use zeta_prompt::Zeta2PromptInput;
 
 #[derive(Clone, Default, Debug, PartialEq, Eq, Hash)]
 pub struct EditPredictionId(pub SharedString);
@@ -21,18 +20,35 @@ impl std::fmt::Display for EditPredictionId {
     }
 }
 
-#[derive(Clone, serde::Serialize)]
-#[serde(tag = "version", content = "input")]
+#[derive(Clone)]
 pub enum EditPredictionInputs {
     V2(Zeta2PromptInput),
-    V3(Zeta3PromptInput),
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum EditPredictionRejectReason {
+    /// New requests were triggered before this one completed
+    Canceled,
+    /// No edits returned
+    Empty,
+    /// Edits returned, but none remained after interpolation
+    InterpolatedEmpty,
+    /// Edits returned, but could not be interpolated after buffer changes
+    InterpolateFailed,
+    /// The new prediction was preferred over the current one
+    Replaced,
+    /// The current prediction was preferred over the new one
+    CurrentPreferred,
+    /// The current prediction was discarded
+    Discarded,
+    /// The current prediction was explicitly rejected by the user
+    Rejected,
 }
 
 /// A prediction response that was returned from the provider, whether it was ultimately valid or not.
 pub struct EditPredictionResult {
     pub prediction: EditPrediction,
     pub reject_reason: Option<EditPredictionRejectReason>,
-    pub e2e_latency: std::time::Duration,
 }
 
 impl EditPredictionResult {
@@ -44,9 +60,6 @@ impl EditPredictionResult {
         cursor_position: Option<PredictedCursorPosition>,
         editable_range: Option<Range<Anchor>>,
         inputs: EditPredictionInputs,
-        model_version: Option<String>,
-        trigger: PredictEditsRequestTrigger,
-        e2e_latency: std::time::Duration,
         cx: &mut AsyncApp,
     ) -> Self {
         let (edits, reject_reason, new_snapshot): (
@@ -97,39 +110,8 @@ impl EditPredictionResult {
                 edit_preview,
                 inputs,
                 buffer: edited_buffer.clone(),
-                model_version,
-                trigger,
             },
             reject_reason,
-            e2e_latency,
-        }
-    }
-
-    pub fn new_rejected(
-        id: EditPredictionId,
-        edited_buffer: &Entity<Buffer>,
-        edited_buffer_snapshot: &BufferSnapshot,
-        inputs: EditPredictionInputs,
-        model_version: Option<String>,
-        trigger: PredictEditsRequestTrigger,
-        e2e_latency: std::time::Duration,
-        reject_reason: EditPredictionRejectReason,
-    ) -> Self {
-        Self {
-            prediction: EditPrediction {
-                id,
-                edits: Arc::default(),
-                cursor_position: None,
-                editable_range: None,
-                snapshot: edited_buffer_snapshot.clone(),
-                edit_preview: EditPreview::unchanged(edited_buffer_snapshot),
-                inputs,
-                buffer: edited_buffer.clone(),
-                model_version,
-                trigger,
-            },
-            reject_reason: Some(reject_reason),
-            e2e_latency,
         }
     }
 }
@@ -144,8 +126,6 @@ pub struct EditPrediction {
     pub edit_preview: EditPreview,
     pub inputs: EditPredictionInputs,
     pub buffer: Entity<Buffer>,
-    pub model_version: Option<String>,
-    pub trigger: PredictEditsRequestTrigger,
 }
 
 impl EditPrediction {
@@ -177,7 +157,6 @@ mod tests {
     use super::*;
     use gpui::{App, Entity, TestAppContext, prelude::*};
     use language::{Buffer, ToOffset as _};
-    use zeta_prompt::Zeta2PromptInput;
 
     #[gpui::test]
     async fn test_edit_prediction_basic_interpolation(cx: &mut TestAppContext) {
@@ -198,8 +177,6 @@ mod tests {
             snapshot: cx.read(|cx| buffer.read(cx).snapshot()),
             buffer: buffer.clone(),
             edit_preview,
-            model_version: None,
-            trigger: PredictEditsRequestTrigger::Other,
             inputs: EditPredictionInputs::V2(Zeta2PromptInput {
                 events: vec![],
                 related_files: Some(vec![]),
