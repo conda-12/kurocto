@@ -1,12 +1,12 @@
-# Contributing to Kurocto
+# Contributing to Kurocto Zed
 
-Kurocto is a modified version of [Zed](https://github.com/zed-industries/zed). Zed's contribution process, issue tracker, community programs, Code of Conduct and Contributor License Agreement belong to Zed Industries and do not apply here. Please do not send Kurocto issues or pull requests to the Zed repository.
+Kurocto Zed is a modified version of [Zed](https://github.com/zed-industries/zed). Zed's contribution process, issue tracker, community programs, Code of Conduct and Contributor License Agreement belong to Zed Industries and do not apply here. Please do not send Kurocto Zed issues or pull requests to the Zed repository.
 
-Kurocto's own contribution policy is still being written. Until it is, the guidance below covers the practical side of sending a change.
+Kurocto Zed's own contribution policy is still being written. Until it is, the guidance below covers the practical side of sending a change.
 
 ## Sending changes
 
-**Build and run Kurocto locally, then manually test your changes before opening a PR.** Follow the guide for [macOS](./docs/src/development/macos.md), [Linux](./docs/src/development/linux.md), [Windows](./docs/src/development/windows.md), or [FreeBSD](./docs/src/development/freebsd.md).
+**Build and run Kurocto Zed locally, then manually test your changes before opening a PR.** Follow the guide for [macOS](./docs/src/development/macos.md), [Linux](./docs/src/development/linux.md), [Windows](./docs/src/development/windows.md), or [FreeBSD](./docs/src/development/freebsd.md).
 
 When preparing your PR:
 
@@ -17,4 +17,4 @@ When preparing your PR:
 
 ## Licensing
 
-Kurocto's source code is licensed primarily under GPL-3.0-or-later, with Apache-2.0 components where marked. See the [README](./README.md#licensing) for how third-party license information is checked.
+Kurocto Zed's source code is licensed primarily under GPL-3.0-or-later, with Apache-2.0 components where marked. See the [README](./README.md#licensing) for how third-party license information is checked.

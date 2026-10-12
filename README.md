@@ -1,18 +1,18 @@
 > [!IMPORTANT]
 > Remove this line to confirm you've reviewed this PR before submitting.
-# Kurocto
+# Kurocto Zed
 
-Kurocto is a code editor. It is a modified version of [Zed](https://github.com/zed-industries/zed), which is developed by Zed Industries, Inc.
+Kurocto Zed is a code editor. It is a modified version of [Zed](https://github.com/zed-industries/zed), which is developed by Zed Industries, Inc.
 
-Kurocto is an independent project. It is not an official Zed release, and it does not use Zed accounts or Zed-operated services.
+Kurocto Zed is an independent project. It is not an official Zed release, and it does not use Zed accounts or Zed-operated services.
 
 ---
 
 ### Relationship to Zed
 
-Kurocto was forked from Zed at upstream commit `93d7456688` (dated 2026-10-10) and has been modified since. The changes are recorded in this repository's git history. Among other things, Kurocto removes Zed account sign-in, Zed-hosted AI services, collaboration, telemetry and crash uploads, and automatic updates from Zed's servers.
+Kurocto Zed was forked from Zed at upstream commit `93d7456688` (dated 2026-10-10) and has been modified since. The changes are recorded in this repository's git history. Among other things, Kurocto Zed removes Zed account sign-in, Zed-hosted AI services, collaboration, telemetry and crash uploads, and automatic updates from Zed's servers.
 
-### Developing Kurocto
+### Developing Kurocto Zed
 
 - [Building for macOS](./docs/src/development/macos.md)
 - [Building for Linux](./docs/src/development/linux.md)
@@ -24,7 +24,7 @@ See [CONTRIBUTING.md](./CONTRIBUTING.md).
 
 ### Licensing
 
-Kurocto's source code is licensed primarily under GPL-3.0-or-later, with Apache-2.0 components where marked, the same as the Zed source code it is based on. See [LICENSE-GPL](./LICENSE-GPL) and [LICENSE-APACHE](./LICENSE-APACHE). Copyright notices from Zed Industries, Inc. and other contributors are retained.
+Kurocto Zed's source code is licensed primarily under GPL-3.0-or-later, with Apache-2.0 components where marked, the same as the Zed source code it is based on. See [LICENSE-GPL](./LICENSE-GPL) and [LICENSE-APACHE](./LICENSE-APACHE). Copyright notices from Zed Industries, Inc. and other contributors are retained.
 
 License information for third party dependencies must be correctly provided for CI to pass.
 
