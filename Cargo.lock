@@ -12952,21 +12952,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "proxy_handshake"
-version = "0.1.0"
-dependencies = [
- "base64",
- "futures 0.3.34",
- "httparse",
- "percent-encoding",
- "piper",
- "proptest",
- "thiserror 2.0.17",
- "tokio",
- "url",
-]
-
-[[package]]
 name = "proxyvars"
 version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
