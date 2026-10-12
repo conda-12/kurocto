@@ -258,6 +258,7 @@ pub fn migrate_settings(text: &str) -> Result<Option<String>> {
         MigrationType::Json(migrations::m_2026_08_30::nest_markdown_preview_settings),
         MigrationType::Json(migrations::m_2026_09_16::nest_agent_threads_sidebar_settings),
         MigrationType::Json(migrations::m_2026_09_29::move_copilot_enterprise_uri),
+        MigrationType::Json(migrations::m_2026_10_12::remove_zed_edit_prediction_settings),
     ];
     run_migrations(text, migrations)
 }
@@ -726,7 +727,7 @@ mod tests {
             Some(indoc! {r#"
                 {
                     "edit_predictions": {
-                        "provider": "zed"
+                        "provider": "none"
                     }
                 }
             "#}),

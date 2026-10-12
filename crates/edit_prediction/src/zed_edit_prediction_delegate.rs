@@ -1,35 +1,24 @@
 use std::{cmp, sync::Arc, time::Duration};
 
-use client::{Client, UserStore};
-use cloud_llm_client::EditPredictionRejectReason;
+use client::Client;
 use edit_prediction_types::{
-    DataCollectionState, EditPredictionDelegate, EditPredictionDiscardReason,
-    EditPredictionIconSet, EditPredictionRequestTrigger, SuggestionDisplayType,
+    EditPredictionDelegate, EditPredictionDiscardReason, EditPredictionIconSet,
+    EditPredictionRequestTrigger, SuggestionDisplayType,
 };
-use feature_flags::FeatureFlagAppExt;
-use fs::Fs;
 use gpui::{App, Entity, prelude::*};
-use language::{Buffer, ToPoint as _};
+use language::ToPoint as _;
 use project::Project;
-use settings::{EditPredictionDataCollectionChoice, update_settings_file};
 
-use crate::{BufferEditPrediction, EditPredictionStore};
+use crate::{BufferEditPrediction, EditPredictionRejectReason, EditPredictionStore};
 
 pub struct ZedEditPredictionDelegate {
     store: Entity<EditPredictionStore>,
     project: Entity<Project>,
-    singleton_buffer: Option<Entity<Buffer>>,
 }
 
 impl ZedEditPredictionDelegate {
-    pub fn new(
-        project: Entity<Project>,
-        singleton_buffer: Option<Entity<Buffer>>,
-        client: &Arc<Client>,
-        user_store: &Entity<UserStore>,
-        cx: &mut Context<Self>,
-    ) -> Self {
-        let store = EditPredictionStore::global(client, user_store, cx);
+    pub fn new(project: Entity<Project>, client: &Arc<Client>, cx: &mut Context<Self>) -> Self {
+        let store = EditPredictionStore::global(client, cx);
         store.update(cx, |store, cx| {
             store.register_project(&project, cx);
         });
@@ -42,7 +31,6 @@ impl ZedEditPredictionDelegate {
         Self {
             project: project,
             store: store,
-            singleton_buffer,
         }
     }
 }
@@ -68,63 +56,6 @@ impl EditPredictionDelegate for ZedEditPredictionDelegate {
         self.store.read(cx).icons(cx)
     }
 
-    fn data_collection_state(&self, cx: &App) -> DataCollectionState {
-        if let Some(buffer) = &self.singleton_buffer
-            && let Some(file) = buffer.read(cx).file()
-        {
-            let is_project_open_source =
-                self.store
-                    .read(cx)
-                    .is_file_open_source(&self.project, file, cx);
-
-            if self.store.read(cx).is_data_collection_enabled(cx) {
-                DataCollectionState::Enabled {
-                    is_project_open_source,
-                }
-            } else {
-                DataCollectionState::Disabled {
-                    is_project_open_source,
-                }
-            }
-        } else {
-            DataCollectionState::Disabled {
-                is_project_open_source: false,
-            }
-        }
-    }
-
-    fn can_toggle_data_collection(&self, cx: &App) -> bool {
-        if cx.is_staff() {
-            return false;
-        }
-
-        self.store
-            .read(cx)
-            .is_data_collection_allowed_by_organization(cx)
-    }
-
-    fn toggle_data_collection(&mut self, cx: &mut App) {
-        let fs = <dyn Fs>::global(cx);
-        let is_currently_enabled = self.store.read(cx).is_data_collection_enabled(cx);
-        update_settings_file(fs, cx, move |settings, _| {
-            let edit_predictions = settings
-                .project
-                .all_languages
-                .edit_predictions
-                .get_or_insert_default();
-
-            edit_predictions.allow_data_collection = Some(if is_currently_enabled {
-                EditPredictionDataCollectionChoice::No
-            } else {
-                EditPredictionDataCollectionChoice::Yes
-            });
-        });
-    }
-
-    fn usage(&self, cx: &App) -> Option<client::EditPredictionUsage> {
-        self.store.read(cx).usage(cx)
-    }
-
     fn is_enabled(
         &self,
         _buffer: &Entity<language::Buffer>,
@@ -143,19 +74,9 @@ impl EditPredictionDelegate for ZedEditPredictionDelegate {
         buffer: Entity<language::Buffer>,
         cursor_position: language::Anchor,
         debounce_duration: Duration,
-        trigger: EditPredictionRequestTrigger,
+        _trigger: EditPredictionRequestTrigger,
         cx: &mut Context<Self>,
     ) {
-        let store = self.store.read(cx);
-
-        if store.user_store.read_with(cx, |user_store, cx| {
-            user_store.account_too_young()
-                || user_store.has_overdue_invoices()
-                || crate::zed_edit_predictions_excluded_from_plan(user_store, cx)
-        }) {
-            return;
-        }
-
         self.store.update(cx, |store, cx| {
             if let Some(current) =
                 store.prediction_at(&buffer, Some(cursor_position), &self.project, cx)
@@ -171,7 +92,6 @@ impl EditPredictionDelegate for ZedEditPredictionDelegate {
                 buffer,
                 cursor_position,
                 debounce_duration,
-                trigger,
                 cx,
             )
         });

@@ -581,7 +581,6 @@ pub fn initialize_workspace(app_state: Arc<AppState>, cx: &mut App) {
         let edit_prediction_ui = cx.new(|cx| {
             edit_prediction_ui::EditPredictionButton::new(
                 app_state.fs.clone(),
-                app_state.user_store.clone(),
                 edit_prediction_menu_handle.clone(),
                 workspace.project().clone(),
                 cx,
@@ -2373,7 +2372,6 @@ const AI_ACTION_NAMESPACES: &[&str] = &[
     "assistant::",
     "edit_prediction::",
     "inline_assistant::",
-    "zeta::",
 ];
 
 fn is_ai_keybinding(binding: &KeyBinding) -> bool {
@@ -5970,8 +5968,6 @@ mod tests {
                 "worktree_picker",
                 "zed",
                 "zed_actions",
-                "zed_predict_onboarding",
-                "zeta",
             ];
             assert_eq!(
                 all_namespaces,

@@ -29,7 +29,6 @@ pub fn request_prediction(
         snapshot,
         position,
         events,
-        trigger,
         ..
     }: EditPredictionModelInput,
     prompt_format: EditPredictionPromptFormat,
@@ -158,9 +157,6 @@ pub fn request_prediction(
                 None,
                 Some(output.editable_range),
                 EditPredictionInputs::V2(output.inputs),
-                None,
-                trigger,
-                cx.background_executor().now() - request_start,
                 cx,
             )
             .await,

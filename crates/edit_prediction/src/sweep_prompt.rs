@@ -4,7 +4,7 @@ use language::{
     BufferSnapshot, OffsetRangeExt as _, Point, ToOffset as _, ToPoint as _,
     language_settings::all_language_settings,
 };
-use std::{fmt::Write as _, ops::Range, path::Path, sync::Arc, time::Instant};
+use std::{fmt::Write as _, ops::Range, path::Path, sync::Arc};
 use zeta_prompt::{RelatedFile, Zeta2PromptInput, filter_redundant_excerpts};
 
 use crate::{
@@ -63,7 +63,6 @@ pub fn request_prediction(
 
     let api_key = load_open_ai_compatible_api_key_if_needed(provider, cx);
     let http_client = cx.http_client();
-    let buffer_snapshotted_at = Instant::now();
 
     let EditPredictionModelInput {
         buffer,
@@ -72,7 +71,6 @@ pub fn request_prediction(
         events,
         stored_events,
         related_files,
-        trigger,
         debug_tx,
         ..
     } = input;
@@ -136,7 +134,7 @@ pub fn request_prediction(
     };
 
     let current_window = prompt_input.current_window;
-    let request_task: Task<Result<(String, String, Instant)>> = cx.background_spawn(async move {
+    let request_task: Task<Result<(String, String)>> = cx.background_spawn(async move {
         let (response_text, request_id) = open_ai_compatible::send_custom_server_request(
             provider,
             &custom_settings,
@@ -148,16 +146,11 @@ pub fn request_prediction(
         )
         .await
         .context("sweep prompt request failed")?;
-        let response_received_at = Instant::now();
-        Ok((
-            request_id,
-            clean_response_text(&response_text),
-            response_received_at,
-        ))
+        Ok((request_id, clean_response_text(&response_text)))
     });
 
     cx.spawn(async move |cx| {
-        let (request_id, response_text, response_received_at) = request_task.await?;
+        let (request_id, response_text) = request_task.await?;
 
         if let Some(debug_tx) = &debug_tx {
             debug_tx
@@ -194,9 +187,6 @@ pub fn request_prediction(
                 None,
                 Some(editable_range),
                 EditPredictionInputs::V2(zeta_input),
-                None,
-                trigger,
-                response_received_at - buffer_snapshotted_at,
                 cx,
             )
             .await,

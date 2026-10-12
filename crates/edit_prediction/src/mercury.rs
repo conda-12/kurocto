@@ -2,11 +2,10 @@ use crate::{
     DebugEvent, EditPredictionFinishedDebugEvent, EditPredictionId, EditPredictionModelInput,
     EditPredictionStartedDebugEvent, EditPredictionStore,
     open_ai_response::text_from_response,
-    prediction::{EditPredictionInputs, EditPredictionResult},
+    prediction::{EditPredictionInputs, EditPredictionRejectReason, EditPredictionResult},
     zeta::compute_edits,
 };
 use anyhow::{Context as _, Result};
-use cloud_llm_client::EditPredictionRejectReason;
 use credentials_provider::CredentialsProvider;
 use futures::AsyncReadExt as _;
 use gpui::{
@@ -52,7 +51,6 @@ impl Mercury {
             events,
             related_files,
             debug_tx,
-            trigger,
             ..
         }: EditPredictionModelInput,
         credentials_provider: Arc<dyn CredentialsProvider>,
@@ -72,7 +70,6 @@ impl Mercury {
 
         let http_client = cx.http_client();
         let cursor_point = position.to_point(&snapshot);
-        let request_start = cx.background_executor().now();
         let active_buffer = buffer.clone();
 
         let result = cx.background_spawn(async move {
@@ -258,9 +255,6 @@ impl Mercury {
                     None,
                     Some(editable_range),
                     EditPredictionInputs::V2(inputs),
-                    None,
-                    trigger,
-                    cx.background_executor().now() - request_start,
                     cx,
                 )
                 .await,
