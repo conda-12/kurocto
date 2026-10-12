@@ -8360,7 +8360,7 @@ impl ThreadView {
         TerminalSandboxWarning {
             title,
             detail,
-            docs_url: zed_urls::sandboxing_docs(docs_section, cx).into(),
+            docs_url: zed_urls::sandboxing_docs(docs_section).into(),
         }
     }
 
@@ -8979,13 +8979,8 @@ impl ThreadView {
     /// `section` when provided. Shared by the sandbox warning and the two
     /// sandbox approval prompts so the user can always reach an explanation of
     /// what they're being asked about.
-    fn render_sandbox_docs_link(
-        &self,
-        id: &'static str,
-        section: Option<&str>,
-        cx: &Context<Self>,
-    ) -> AnyElement {
-        let url = zed_urls::sandboxing_docs(section, cx);
+    fn render_sandbox_docs_link(&self, id: &'static str, section: Option<&str>) -> AnyElement {
+        let url = zed_urls::sandboxing_docs(section);
 
         Button::new(id, "View Sandboxing Docs")
             .label_size(LabelSize::Small)
@@ -9274,14 +9269,9 @@ impl ThreadView {
                 // The Windows-drive warning banner carries its own docs link, so
                 // skip the default one that every other sandbox prompt appends.
                 this.child(
-                    h_flex()
-                        .px_1()
-                        .py_0p5()
-                        .child(self.render_sandbox_docs_link(
-                            "sandbox-authorization-docs-link",
-                            None,
-                            cx,
-                        )),
+                    h_flex().px_1().py_0p5().child(
+                        self.render_sandbox_docs_link("sandbox-authorization-docs-link", None),
+                    ),
                 )
             })
             .into_any_element()
@@ -9508,7 +9498,6 @@ impl ThreadView {
                             .child(h_flex().child(self.render_sandbox_docs_link(
                                 "sandbox-windows-fs-docs-link",
                                 Some("windows"),
-                                cx,
                             ))),
                     )
                     .child(
@@ -9591,7 +9580,6 @@ impl ThreadView {
                     .child(self.render_sandbox_docs_link(
                         "sandbox-fallback-docs-link",
                         details.docs_section.as_deref(),
-                        cx,
                     )),
             )
             .into_any_element()
@@ -11498,7 +11486,7 @@ impl ThreadView {
             ThreadError::RateLimitExceeded { provider } => self.render_error_callout(
                 "Rate Limit Reached",
                 format!(
-                    "{provider}'s rate limit was reached. Zed will retry automatically. \
+                    "{provider}'s rate limit was reached. Kurocto will retry automatically. \
                     You can also wait a moment and try again."
                 )
                 .into(),
@@ -11509,7 +11497,7 @@ impl ThreadView {
             ThreadError::ServerOverloaded { provider } => self.render_error_callout(
                 "Provider Unavailable",
                 format!(
-                    "{provider}'s servers are temporarily unavailable. Zed will retry \
+                    "{provider}'s servers are temporarily unavailable. Kurocto will retry \
                     automatically. If the problem persists, check the provider's status page."
                 )
                 .into(),
@@ -11529,7 +11517,7 @@ impl ThreadView {
             ThreadError::StreamError { provider } => self.render_error_callout(
                 "Connection Interrupted",
                 format!(
-                    "The connection to {provider}'s API was interrupted. Zed will retry \
+                    "The connection to {provider}'s API was interrupted. Kurocto will retry \
                     automatically. If the problem persists, check your network connection."
                 )
                 .into(),
@@ -11578,7 +11566,7 @@ impl ThreadView {
                 "API Error",
                 format!(
                     "{provider}'s API returned an unexpected error. \
-                    If the problem persists, try switching models or restarting Zed."
+                    If the problem persists, try switching models or restarting Kurocto."
                 )
                 .into(),
                 true,

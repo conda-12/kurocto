@@ -1805,7 +1805,7 @@ impl Workspace {
                         if let Some(link) = link {
                             notification = notification
                                 .more_info_message(link.label)
-                                .more_info_url(link.url);
+                                .more_info_url(link.url.clone());
                         }
 
                         cx.new(|_| notification)
@@ -9910,9 +9910,9 @@ actions!(collab, []);
 actions!(
     zed,
     [
-        /// Opens the Zed log file.
+        /// Opens the Kurocto log file.
         OpenLog,
-        /// Reveals the Zed log file in the system file manager.
+        /// Reveals the Kurocto log file in the system file manager.
         RevealLogInFileManager
     ]
 );
@@ -12090,7 +12090,7 @@ mod tests {
             });
         });
         cx.executor().run_until_parked();
-        assert_eq!(cx.window_title().as_deref(), Some("Zed — root1, root2"));
+        assert_eq!(cx.window_title().as_deref(), Some("Kurocto — root1, root2"));
 
         let item = cx.new(|cx| {
             TestItem::new(cx).with_project_items(&[TestProjectItem::new_in_worktree(
@@ -12107,7 +12107,7 @@ mod tests {
         let expected_file_path = path!("/root1/src/one.txt");
         assert_eq!(
             cx.window_title().as_deref(),
-            Some(format!("Zed — root1, root2 — one — {expected_file_path}").as_str())
+            Some(format!("Kurocto — root1, root2 — one — {expected_file_path}").as_str())
         );
     }
 

@@ -1,11 +1,11 @@
 ---
 title: Biome
-description: "Configure Biome language support in Zed, including language servers, formatting, and debugging."
+description: "Configure Biome language support in Kurocto, including language servers, formatting, and debugging."
 ---
 
 # Biome
 
-[Biome](https://biomejs.dev/) support in Zed is provided by the community-maintained [Biome extension](https://github.com/biomejs/biome-zed).
+[Biome](https://biomejs.dev/) support in Kurocto is provided by the community-maintained [Biome extension](https://github.com/biomejs/biome-zed).
 Report issues to: [https://github.com/biomejs/biome-zed/issues](https://github.com/biomejs/biome-zed/issues)
 
 - Language Server: [biomejs/biome](https://github.com/biomejs/biome)

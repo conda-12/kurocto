@@ -63,7 +63,7 @@ fn copy_markdown_sources(destination: &Path, site_url: &str, pages: &[DocsPage])
                 format!("failed to create markdown destination {}", parent.display())
             })?;
         }
-        let contents = rewrite_docs_links(&markdown_source_contents(&page.content), site_url);
+        let contents = markdown_source_contents(&page.content);
         std::fs::write(
             &destination,
             add_llms_markdown_directive(&contents, site_url),
@@ -120,12 +120,12 @@ fn front_matter_comment_regex() -> &'static Regex {
 
 fn write_llms_txt(destination: &Path, site_url: &str, pages: &[DocsPage]) -> Result<()> {
     let mut contents = String::new();
-    contents.push_str("# Zed Docs\n\n");
+    contents.push_str("# Kurocto Docs\n\n");
     contents.push_str(
-        "> Official Zed documentation index with links to Markdown versions of each docs page.\n\n",
+        "> Kurocto documentation index with links to Markdown versions of each docs page.\n\n",
     );
     contents.push_str(
-        "Use these links for concise Markdown copies of Zed documentation pages. Each linked page mirrors the corresponding `/docs/*.html` page without site navigation or styling.\n\n",
+        "Use these links for concise Markdown copies of Kurocto documentation pages. Each linked page mirrors the corresponding `/docs/*.html` page without site navigation or styling.\n\n",
     );
     let mut current_section = None;
     for page in pages {
@@ -141,7 +141,7 @@ fn write_llms_txt(destination: &Path, site_url: &str, pages: &[DocsPage]) -> Res
         contents.push_str("- [");
         contents.push_str(&markdown_text(&page.title));
         contents.push_str("](");
-        contents.push_str(&absolute_docs_url(site_url, &page.source_path));
+        contents.push_str(&docs_url(site_url, &page.source_path));
         contents.push(')');
         if let Some(description) = &page.description {
             contents.push_str(": ");
@@ -160,12 +160,17 @@ fn markdown_text(text: &str) -> String {
 }
 
 fn write_sitemap_xml(destination: &Path, site_url: &str, pages: &[DocsPage]) -> Result<()> {
+    // Sitemap locations must be absolute URLs, so there is nothing valid to
+    // write when the docs are built for a relative site URL.
+    if !site_url.starts_with("http://") && !site_url.starts_with("https://") {
+        return Ok(());
+    }
     let mut contents = String::new();
     contents.push_str("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n");
     contents.push_str("<urlset xmlns=\"http://www.sitemaps.org/schemas/sitemap/0.9\">\n");
     for page in pages {
         contents.push_str("  <url><loc>");
-        contents.push_str(&xml_escape(&absolute_docs_url(
+        contents.push_str(&xml_escape(&docs_url(
             site_url,
             &page.source_path.with_extension("html"),
         )));
@@ -305,29 +310,6 @@ fn split_fragment(path: &str) -> (&str, &str) {
     }
 }
 
-pub(crate) fn rewrite_docs_links(contents: &str, site_url: &str) -> String {
-    const STABLE_DOCS_PREFIX: &str = "https://zed.dev/docs/";
-    let channel_docs_prefix = absolute_docs_url(site_url, Path::new(""));
-    if channel_docs_prefix == STABLE_DOCS_PREFIX {
-        return contents.to_string();
-    }
-
-    let mut output = String::with_capacity(contents.len());
-    let mut remaining = contents;
-    while let Some(index) = remaining.find(STABLE_DOCS_PREFIX) {
-        output.push_str(&remaining[..index]);
-        let after_prefix = &remaining[index + STABLE_DOCS_PREFIX.len()..];
-        if after_prefix.starts_with("preview/") || after_prefix.starts_with("nightly/") {
-            output.push_str(STABLE_DOCS_PREFIX);
-        } else {
-            output.push_str(&channel_docs_prefix);
-        }
-        remaining = after_prefix;
-    }
-    output.push_str(remaining);
-    output
-}
-
 pub(crate) fn add_markdown_alternate_link(
     contents: &str,
     html_file: &Path,
@@ -381,15 +363,6 @@ fn docs_url(site_url: &str, path: &Path) -> String {
     url
 }
 
-fn absolute_docs_url(site_url: &str, path: &Path) -> String {
-    let url = docs_url(site_url, path);
-    if url.starts_with("http://") || url.starts_with("https://") {
-        url
-    } else {
-        format!("https://zed.dev{}", url)
-    }
-}
-
 fn xml_escape(value: &str) -> String {
     value
         .replace('&', "&amp;")
@@ -423,17 +396,6 @@ mod tests {
         assert_eq!(
             redirect_destination("/docs/preview/", "/community-links"),
             "/community-links"
-        );
-    }
-
-    #[test]
-    fn test_rewrite_docs_links_uses_channel_site_url() {
-        assert_eq!(
-            rewrite_docs_links(
-                "See [Code Actions](https://zed.dev/docs/configuring-languages#code-actions) and [Preview](https://zed.dev/docs/preview/ai/overview.html).",
-                "/docs/preview/"
-            ),
-            "See [Code Actions](https://zed.dev/docs/preview/configuring-languages#code-actions) and [Preview](https://zed.dev/docs/preview/ai/overview.html)."
         );
     }
 
@@ -520,19 +482,17 @@ mod tests {
 
         let llms_txt = std::fs::read_to_string(destination.join("llms.txt"))?;
         assert!(llms_txt.contains("## Docs"));
-        assert!(llms_txt.contains(
-            "- [Getting Started](https://zed.dev/docs/getting-started.md): Start using Zed."
-        ));
-        assert!(llms_txt.contains("## AI"));
         assert!(
-            llms_txt.contains(
-                "- [MCP](https://zed.dev/docs/ai/mcp.md): Connect model context servers."
-            )
+            llms_txt.contains("- [Getting Started](/docs/getting-started.md): Start using Zed.")
         );
+        assert!(llms_txt.contains("## AI"));
+        assert!(llms_txt.contains("- [MCP](/docs/ai/mcp.md): Connect model context servers."));
+        assert!(!destination.join("sitemap.xml").exists());
 
+        write_sitemap_xml(&destination, "https://docs.example.com/", &pages)?;
         let sitemap_xml = std::fs::read_to_string(destination.join("sitemap.xml"))?;
-        assert!(sitemap_xml.contains("<loc>https://zed.dev/docs/getting-started.html</loc>"));
-        assert!(sitemap_xml.contains("<loc>https://zed.dev/docs/ai/mcp.html</loc>"));
+        assert!(sitemap_xml.contains("<loc>https://docs.example.com/getting-started.html</loc>"));
+        assert!(sitemap_xml.contains("<loc>https://docs.example.com/ai/mcp.html</loc>"));
 
         let mcp_markdown = std::fs::read_to_string(destination.join("ai/mcp.md"))?;
         assert!(mcp_markdown.starts_with(

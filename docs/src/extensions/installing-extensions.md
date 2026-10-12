@@ -5,9 +5,9 @@ description: "Install and manage extensions from a local directory or from an ex
 
 # Installing Extensions {#installing-extensions}
 
-Extensions add functionality to Zed, including languages, themes, and AI tools.
+Extensions add functionality to Kurocto, including languages, themes, and AI tools.
 
-Open the Extensions page with {#kb zed::Extensions}, or select "Zed > Extensions" from the menu bar. It lists the extensions you have installed.
+Open the Extensions page with {#kb zed::Extensions}, or select "Kurocto > Extensions" from the menu bar. It lists the extensions you have installed.
 
 ## Extension Registry {#extension-registry}
 
@@ -27,9 +27,9 @@ Extension listings and downloads are then requested from that URL, and the IDs o
 
 ## Installation Location
 
-- On macOS, extensions are installed in `~/Library/Application Support/Zed/extensions`.
-- On Linux, they are installed in either `$XDG_DATA_HOME/zed/extensions` or `~/.local/share/zed/extensions`.
-- On Windows, the directory is `%LOCALAPPDATA%\Zed\extensions`.
+- On macOS, extensions are installed in `~/Library/Application Support/Kurocto/extensions`.
+- On Linux, they are installed in either `$XDG_DATA_HOME/kurocto/extensions` or `~/.local/share/kurocto/extensions`.
+- On Windows, the directory is `%LOCALAPPDATA%\Kurocto\extensions`.
 
 This directory contains two subdirectories:
 

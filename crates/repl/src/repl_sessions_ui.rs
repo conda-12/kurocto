@@ -254,9 +254,9 @@ impl Render for ReplSessionsPage {
                             .layer(ElevationIndex::ModalSurface)
                             .child(Label::new("Install Kernels"))
                             .on_click(move |_, _, cx| {
-                                cx.open_url(
-                                    "https://zed.dev/docs/repl#language-specific-instructions",
-                                )
+                                cx.open_url(&release_channel::docs_url(
+                                    "repl#language-specific-instructions",
+                                ))
                             }),
                     ),
                 );

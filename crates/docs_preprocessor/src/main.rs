@@ -2,7 +2,7 @@ use anyhow::{Context, Result};
 mod ai_discovery;
 
 use ai_discovery::{
-    add_markdown_alternate_link, docs_pages, rewrite_docs_links, write_ai_discovery_artifacts,
+    add_markdown_alternate_link, docs_pages, write_ai_discovery_artifacts,
     write_markdown_redirect_aliases, write_pages_redirects,
 };
 use mdbook::BookItem;
@@ -715,8 +715,6 @@ fn handle_postprocessing() -> Result<()> {
         .as_str()
         .expect("Default title not a string")
         .to_string();
-    let amplitude_key = std::env::var("DOCS_AMPLITUDE_API_KEY").unwrap_or_default();
-    let consent_io_instance = std::env::var("DOCS_CONSENT_IO_INSTANCE").unwrap_or_default();
     let docs_channel = std::env::var("DOCS_CHANNEL").unwrap_or_else(|_| "stable".to_string());
     let site_url = std::env::var("MDBOOK_BOOK__SITE_URL")
         .ok()
@@ -804,10 +802,7 @@ fn handle_postprocessing() -> Result<()> {
         let meta_title = format!("{} | {}", page_title, meta_title);
         zlog::trace!(logger => "Updating {:?}", pretty_path(&file, &root_dir));
         let contents = contents.replace("#description#", meta_description);
-        let contents = contents.replace("#amplitude_key#", &amplitude_key);
-        let contents = contents.replace("#consent_io_instance#", &consent_io_instance);
         let contents = contents.replace("#noindex#", noindex);
-        let contents = rewrite_docs_links(&contents, &site_url);
         let contents = add_markdown_alternate_link(&contents, file, &root_dir, &site_url);
         let contents = title_regex()
             .replace(&contents, |_: &regex::Captures| {
@@ -836,7 +831,7 @@ fn handle_postprocessing() -> Result<()> {
 
         title_tag_contents
             .trim()
-            .strip_suffix("- Zed")
+            .strip_suffix("- Kurocto")
             .unwrap_or(title_tag_contents)
             .trim()
             .to_string()

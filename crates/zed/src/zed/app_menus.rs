@@ -66,10 +66,10 @@ pub fn app_menus(cx: &mut App) -> Vec<Menu> {
 
     vec![
         Menu {
-            name: "Zed".into(),
+            name: "Kurocto".into(),
             disabled: false,
             items: vec![
-                MenuItem::action("About Zed", zed_actions::About),
+                MenuItem::action("About Kurocto", zed_actions::About),
                 MenuItem::action("Check for Updates", zed_actions::CheckForUpdates),
                 MenuItem::separator(),
                 MenuItem::submenu(Menu::new("Settings").items([
@@ -101,13 +101,13 @@ pub fn app_menus(cx: &mut App) -> Vec<Menu> {
                 MenuItem::action("Install CLI", install_cli::InstallCliBinary),
                 MenuItem::separator(),
                 #[cfg(target_os = "macos")]
-                MenuItem::action("Hide Zed", super::Hide),
+                MenuItem::action("Hide Kurocto", super::Hide),
                 #[cfg(target_os = "macos")]
                 MenuItem::action("Hide Others", super::HideOthers),
                 #[cfg(target_os = "macos")]
                 MenuItem::action("Show All", super::ShowAll),
                 MenuItem::separator(),
-                MenuItem::action("Quit Zed", Quit),
+                MenuItem::action("Quit Kurocto", Quit),
             ],
         },
         Menu {
@@ -311,7 +311,7 @@ pub fn app_menus(cx: &mut App) -> Vec<Menu> {
                 MenuItem::action(
                     "Documentation",
                     super::OpenBrowser {
-                        url: "https://zed.dev/docs".into(),
+                        url: release_channel::docs_url("").into(),
                     },
                 ),
                 MenuItem::action("Kurocto Repository", feedback::OpenZedRepo),

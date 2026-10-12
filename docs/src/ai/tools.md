@@ -1,21 +1,21 @@
 ---
-title: AI Agent Tools - Zed
-description: Built-in tools for Zed's AI agent including file editing, code search, terminal commands, skills, and diagnostics.
+title: AI Agent Tools - Kurocto
+description: Built-in tools for Kurocto's AI agent including file editing, code search, terminal commands, skills, and diagnostics.
 ---
 
 # Tools
 
-Zed's built-in agent has access to these tools for reading, searching, and editing your codebase. These tools are used in the [Agent Panel](./agent-panel.md) during conversations with AI agents.
+Kurocto's built-in agent has access to these tools for reading, searching, and editing your codebase. These tools are used in the [Agent Panel](./agent-panel.md) during conversations with AI agents.
 
-The exact tool list can vary by [Agent Profile](./agent-profiles.md), selected model provider, and Zed version.
+The exact tool list can vary by [Agent Profile](./agent-profiles.md), selected model provider, and Kurocto version.
 
 You can configure permissions for tool actions, including situations where they are automatically approved, automatically denied, or require your confirmation on a case-by-case basis. See [Tool Permissions](./tool-permissions.md) for the list of permission-gated tools and details.
 
 To add custom tools beyond these built-in ones, see [MCP servers](./mcp.md).
 
-To choose which built-in tools and MCP tools are available in a Zed Agent thread, use [Agent Profiles](./agent-profiles.md). Profiles control tool availability; tool permissions control allow, deny, and confirm behavior.
+To choose which built-in tools and MCP tools are available in a Kurocto Agent thread, use [Agent Profiles](./agent-profiles.md). Profiles control tool availability; tool permissions control allow, deny, and confirm behavior.
 
-The terminal tool can also run with additional OS-level restrictions when [Zed Agent sandboxing](./sandboxing.md) is enabled.
+The terminal tool can also run with additional OS-level restrictions when [Kurocto Agent sandboxing](./sandboxing.md) is enabled.
 
 ## Read & Search Tools
 
@@ -59,7 +59,7 @@ Reads the content of a specified file in the project, allowing access to file co
 
 Searches the web for information, providing results with snippets and links from relevant web pages.
 
-> **Note:** The built-in `search_web` tool is only available when a web search provider is registered, and Zed does not ship one. To get equivalent functionality, connect an MCP server that provides web search capabilities. See [MCP servers](./mcp.md) for details.
+> **Note:** The built-in `search_web` tool is only available when a web search provider is registered, and Kurocto does not ship one. To get equivalent functionality, connect an MCP server that provides web search capabilities. See [MCP servers](./mcp.md) for details.
 
 ## Edit Tools
 

@@ -332,7 +332,7 @@ impl Component for TerminalToolHeader {
         let sandbox_warning = || TerminalSandboxWarning {
             title: "Ran without sandbox".into(),
             detail: "Unsandboxed execution is allowed for the rest of this thread.".into(),
-            docs_url: "https://zed.dev/docs/ai/sandboxing".into(),
+            docs_url: release_channel::docs_url("ai/sandboxing").into(),
         };
 
         v_flex()

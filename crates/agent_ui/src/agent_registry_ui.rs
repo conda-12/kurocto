@@ -1,6 +1,5 @@
 use std::ops::Range;
 
-use client::zed_urls;
 use collections::HashMap;
 use editor::{Editor, EditorElement, EditorStyle};
 use fs::Fs;
@@ -604,20 +603,7 @@ impl Render for AgentRegistryPage {
                             .w_full()
                             .gap_1p5()
                             .justify_between()
-                            .child(Headline::new("ACP Registry").size(HeadlineSize::Large))
-                            .child(
-                                Button::new("learn-more", "Learn More")
-                                    .style(ButtonStyle::Outlined)
-                                    .size(ButtonSize::Medium)
-                                    .end_icon(
-                                        Icon::new(IconName::ArrowUpRight)
-                                            .size(IconSize::Small)
-                                            .color(Color::Muted),
-                                    )
-                                    .on_click(move |_, _, cx| {
-                                        cx.open_url(&zed_urls::acp_registry_blog(cx))
-                                    }),
-                            ),
+                            .child(Headline::new("ACP Registry").size(HeadlineSize::Large)),
                     )
                     .child(
                         h_flex()

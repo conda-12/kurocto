@@ -226,54 +226,21 @@ impl HttpClient for HttpClientWithProxy {
     }
 }
 
-/// An [`HttpClient`] that has a base URL.
 pub struct HttpClientWithUrl {
-    base_url: Mutex<String>,
     client: HttpClientWithProxy,
 }
 
 impl HttpClientWithUrl {
-    /// Returns a new [`HttpClientWithUrl`] with the given base URL.
-    pub fn new(
-        client: Arc<dyn HttpClient>,
-        base_url: impl Into<String>,
-        proxy_url: Option<String>,
-    ) -> Self {
+    pub fn new(client: Arc<dyn HttpClient>, proxy_url: Option<String>) -> Self {
         let client = HttpClientWithProxy::new(client, proxy_url);
 
-        Self {
-            base_url: Mutex::new(base_url.into()),
-            client,
-        }
+        Self { client }
     }
 
-    pub fn new_url(
-        client: Arc<dyn HttpClient>,
-        base_url: impl Into<String>,
-        proxy_url: Option<Url>,
-    ) -> Self {
+    pub fn new_url(client: Arc<dyn HttpClient>, proxy_url: Option<Url>) -> Self {
         let client = HttpClientWithProxy::new_url(client, proxy_url);
 
-        Self {
-            base_url: Mutex::new(base_url.into()),
-            client,
-        }
-    }
-
-    /// Returns the base URL.
-    pub fn base_url(&self) -> String {
-        self.base_url.lock().clone()
-    }
-
-    /// Sets the base URL.
-    pub fn set_base_url(&self, base_url: impl Into<String>) {
-        let base_url = base_url.into();
-        *self.base_url.lock() = base_url;
-    }
-
-    /// Builds a URL using the given path.
-    pub fn build_url(&self, path: &str) -> String {
-        format!("{}{}", self.base_url(), path)
+        Self { client }
     }
 }
 
@@ -388,7 +355,6 @@ impl FakeHttpClient {
         F: Fn(Request<AsyncBody>) -> Fut + Send + Sync + 'static,
     {
         Arc::new(HttpClientWithUrl {
-            base_url: Mutex::new("http://test.example".into()),
             client: HttpClientWithProxy {
                 client: Arc::new(Self {
                     handler: Mutex::new(Some(Arc::new(move |req| Box::pin(handler(req))))),

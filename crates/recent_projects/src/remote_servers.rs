@@ -2376,7 +2376,7 @@ impl RemoteServerProjects {
                                                 .color(Color::Muted)
                                                 .size(IconSize::Small),
                                         )
-                                        .child(Label::new("Open Zed Log"))
+                                        .child(Label::new("Open Kurocto Log"))
                                         .on_click(cx.listener(|_, _, window, cx| {
                                             window.dispatch_action(Box::new(OpenLog), cx);
                                             cx.emit(DismissEvent);
@@ -2543,9 +2543,9 @@ impl RemoteServerProjects {
                                                     .size(IconSize::XSmall),
                                             )
                                             .on_click(|_, _, cx| {
-                                                cx.open_url(
-                                                    "https://zed.dev/docs/remote-development",
-                                                );
+                                                cx.open_url(&release_channel::docs_url(
+                                                    "remote-development",
+                                                ));
                                             }),
                                     ),
                             )

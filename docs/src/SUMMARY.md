@@ -41,7 +41,7 @@
 - [AI Quick Start](./ai/quick-start.md)
 - [AI by Company](./ai/by-company.md)
 - [Agents](./ai/agents.md)
-  - [Zed Agent](./ai/zed-agent.md)
+  - [Kurocto Agent](./ai/zed-agent.md)
   - [External Agents](./ai/external-agents.md)
   - [Terminal Threads](./ai/terminal-threads.md)
 - [Agent Panel](./ai/agent-panel.md)
@@ -67,7 +67,6 @@
 
 - [Worktree Trust](./worktree-trust.md)
 - [Telemetry](./telemetry.md)
-- [SOC2](./soc2.md)
 
 # Platform Support
 
@@ -198,9 +197,9 @@
 - [All Actions](./all-actions.md)
 - [CLI Reference](./reference/cli.md)
 
-# Developing Zed
+# Developing Kurocto
 
-- [Developing Zed](./development.md)
+- [Developing Kurocto](./development.md)
   - [macOS](./development/macos.md)
   - [Linux](./development/linux.md)
   - [Windows](./development/windows.md)

@@ -59,6 +59,7 @@ use language_model::{
 };
 use project::{
     AgentId, Project, ProjectItem, ProjectPath, Worktree, WorktreeId,
+    agent_server_store::{NATIVE_AGENT_DISPLAY_NAME, NATIVE_AGENT_ID},
     trusted_worktrees::TrustedWorktrees,
 };
 use prompt_store::{ProjectContext, RULES_FILE_NAMES, RulesFileContext, WorktreeContext};
@@ -2773,7 +2774,7 @@ fn model_id_to_selection(model_id: &AgentModelId, cx: &App) -> LanguageModelSele
     agent_settings::language_model_to_selection(&resolved, current_user_selection.as_ref())
 }
 
-pub static ZED_AGENT_ID: LazyLock<AgentId> = LazyLock::new(|| AgentId::new("Zed Agent"));
+pub static ZED_AGENT_ID: LazyLock<AgentId> = LazyLock::new(|| AgentId::new(NATIVE_AGENT_ID));
 
 pub fn available_native_agent(cx: &App) -> AvailableAgent {
     let registry = LanguageModelRegistry::read_global(cx);
@@ -2799,7 +2800,7 @@ pub fn available_native_agent(cx: &App) -> AvailableAgent {
 
     AvailableAgent {
         id: ZED_AGENT_ID.to_string(),
-        name: ZED_AGENT_ID.0.clone(),
+        name: NATIVE_AGENT_DISPLAY_NAME.into(),
         is_native: true,
         models,
     }

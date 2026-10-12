@@ -71,6 +71,11 @@ impl std::fmt::Debug for AgentServerCommand {
 #[serde(transparent)]
 pub struct AgentId(pub SharedString);
 
+/// The built-in agent's identifier. Persisted with thread metadata, so it keeps
+/// its original value even though the agent is displayed under a different name.
+pub const NATIVE_AGENT_ID: &str = "Zed Agent";
+pub const NATIVE_AGENT_DISPLAY_NAME: &str = "Kurocto Agent";
+
 impl AgentId {
     pub fn new(id: impl Into<SharedString>) -> Self {
         AgentId(id.into())
@@ -253,6 +258,9 @@ impl AgentServerStore {
 
 impl AgentServerStore {
     pub fn agent_display_name(&self, name: &AgentId) -> Option<SharedString> {
+        if name.as_ref() == NATIVE_AGENT_ID {
+            return Some(NATIVE_AGENT_DISPLAY_NAME.into());
+        }
         self.external_agents
             .get(name)
             .and_then(|entry| entry.display_name.clone())

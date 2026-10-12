@@ -1,23 +1,23 @@
 ---
-title: Zed Agent
-description: Use Zed's native AI agent with Zed-configured models, tools, profiles, skills, instructions, and MCP servers.
+title: Kurocto Agent
+description: Use Kurocto's native AI agent with Kurocto-configured models, tools, profiles, skills, instructions, and MCP servers.
 ---
 
-# Zed Agent
+# Kurocto Agent
 
-Zed Agent is Zed's native agent path. It runs in the [Agent Panel](./agent-panel.md) and [Threads Sidebar](./parallel-agents.md#threads-sidebar), uses models configured through [LLM Providers](./llm-providers.md), and integrates with Zed's project, editor, terminal, and review surfaces.
+Kurocto Agent is Kurocto's native agent path. It runs in the [Agent Panel](./agent-panel.md) and [Threads Sidebar](./parallel-agents.md#threads-sidebar), uses models configured through [LLM Providers](./llm-providers.md), and integrates with Kurocto's project, editor, terminal, and review surfaces.
 
-Use Zed Agent when you want the agent to:
+Use Kurocto Agent when you want the agent to:
 
 - read and search your project
 - edit files
 - run terminal commands
-- use Zed-managed MCP tools
+- use Kurocto-managed MCP tools
 - follow [Agent Profiles](./agent-profiles.md)
-- use Zed [Skills](./skills.md) and [Instructions](./instructions.md)
-- show changes in Zed's review UI
+- use Kurocto [Skills](./skills.md) and [Instructions](./instructions.md)
+- show changes in Kurocto's review UI
 
-## What Zed Agent Uses {#what-zed-agent-uses}
+## What Kurocto Agent Uses {#what-zed-agent-uses}
 
 | Capability                 | Source of truth                           |
 | -------------------------- | ----------------------------------------- |
@@ -34,7 +34,7 @@ Use Zed Agent when you want the agent to:
 
 | Agent path                                | Main difference                                                                              |
 | ----------------------------------------- | -------------------------------------------------------------------------------------------- |
-| [Zed Agent](./zed-agent.md)               | Uses Zed's model, tool, profile, skill, instruction, and MCP configuration                   |
+| [Kurocto Agent](./zed-agent.md)               | Uses Kurocto's model, tool, profile, skill, instruction, and MCP configuration                   |
 | [External Agents](./external-agents.md)   | Use an ACP integration and often own auth, model, tool, and native instruction configuration |
 | [Terminal Threads](./terminal-threads.md) | Run a CLI/TUI in a terminal-backed thread; the CLI owns auth and configuration               |
 

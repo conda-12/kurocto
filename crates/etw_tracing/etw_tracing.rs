@@ -496,7 +496,7 @@ fn record_etw_trace_inner(heap_pid: Option<u32>, stream: &mut net::UnixStream) -
     send_json(stream, &StatusMessage::Started)?;
 
     let command: Command =
-        recv_json(&mut BufReader::new(&mut *stream)).context("Receive command from Zed")?;
+        recv_json(&mut BufReader::new(&mut *stream)).context("Receive command from Kurocto")?;
 
     match command {
         Command::Cancel => {

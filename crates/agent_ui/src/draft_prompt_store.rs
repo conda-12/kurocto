@@ -14,7 +14,7 @@ use anyhow::Context as _;
 use db::kvp::KeyValueStore;
 use gpui::{App, AppContext as _, Entity, Task};
 use itertools::Itertools;
-use project::AgentId;
+use project::{AgentId, agent_server_store::NATIVE_AGENT_DISPLAY_NAME};
 use ui::SharedString;
 use util::ResultExt as _;
 use workspace::Workspace;
@@ -172,7 +172,7 @@ pub fn empty_draft_placeholder_label(
     cx: &App,
 ) -> SharedString {
     let agent_name = if agent_id.as_ref() == ZED_AGENT_ID.as_ref() {
-        SharedString::from(ZED_AGENT_ID.to_string())
+        SharedString::from(NATIVE_AGENT_DISPLAY_NAME)
     } else {
         workspace
             .map(|ws| ws.read(cx).project().read(cx).agent_server_store().clone())

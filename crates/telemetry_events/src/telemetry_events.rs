@@ -1,4 +1,4 @@
-//! See [Telemetry in Zed](https://zed.dev/docs/telemetry) for additional information.
+//! See `docs/src/telemetry.md` for additional information.
 
 use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, fmt::Display, time::Duration};

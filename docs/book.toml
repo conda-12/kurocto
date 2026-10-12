@@ -3,7 +3,7 @@ authors = ["The Zed Team"]
 language = "en"
 multilingual = false
 src = "src"
-title = "Zed"
+title = "Kurocto"
 site-url = "/docs/"
 
 [build]
@@ -20,12 +20,12 @@ command = "cargo run -p docs_preprocessor -- postprocess"
 smart-punctuation = true
 # Set here instead of above as we only use it replace the `#description#` we set in the template
 # when no front-matter is provided value
-default-description = "Learn how to use and customize Zed, the fast, collaborative code editor. Official docs on features, configuration, AI tools, and workflows."
-default-title = "Zed Code Editor Documentation"
+default-description = "Learn how to use and customize Kurocto. Docs on features, configuration, AI tools, and workflows."
+default-title = "Kurocto Code Editor Documentation"
 no-section-label = true
 preferred-dark-theme = "dark"
-additional-css = ["theme/page-toc.css", "theme/plugins.css", "theme/highlight.css", "theme/consent-banner.css"]
-additional-js  = ["redirects/legacy-fragment-redirects.js", "theme/page-toc.js", "theme/plugins.js", "theme/c15t@2.0.0-rc.3.js", "theme/analytics.js"]
+additional-css = ["theme/page-toc.css", "theme/plugins.css", "theme/highlight.css"]
+additional-js  = ["redirects/legacy-fragment-redirects.js", "theme/page-toc.js", "theme/plugins.js"]
 
 [output.zed-html.print]
 enable = false
@@ -36,9 +36,8 @@ enable = false
 # 1. Not start with `/docs`
 # 2. End in `.html`
 #
-# The destination URLs are interpreted relative to `https://zed.dev`.
+# The destination URLs are interpreted relative to the host that serves the docs.
 # - Redirects to other docs pages should end in `.html`
-# - You can link to pages on the Zed site by omitting the `/docs` in front of it.
 [output.zed-html.redirect]
 # AI
 "/ai.html" = "/docs/ai/overview.html"
@@ -61,10 +60,6 @@ enable = false
 # Core
 "/configuring-zed.html" = "/docs/reference/all-settings.html"
 
-# Community
-"/community/feedback.html" = "/community-links"
-"/conversations.html" = "/community-links"
-
 # Debugger
 "/debuggers.html" = "/docs/debugger.html"
 
@@ -86,7 +81,7 @@ enable = false
 "/python.html" = "/docs/languages/python.html"
 "/ruby.html" = "/docs/languages/ruby.html"
 
-# Zed development
+# Kurocto development
 "/contribute-to-zed.html" = "/docs/development.html#contributor-links"
 "/contributing.html" = "/docs/development.html#contributor-links"
 "/developing-zed.html" = "/docs/development.html"

@@ -1,12 +1,12 @@
 ---
-title: AI Code Completion in Zed - Copilot, Codestral, Mercury Coder
-description: Set up AI code completions in Zed with GitHub Copilot, Codestral, Mercury Coder, or a local model. Multi-line predictions as you type.
+title: AI Code Completion in Kurocto - Copilot, Codestral, Mercury Coder
+description: Set up AI code completions in Kurocto with GitHub Copilot, Codestral, Mercury Coder, or a local model. Multi-line predictions as you type.
 ---
 
 # Edit Prediction
 
-Edit Prediction is how Zed's AI code completions work: an LLM predicts the code you want to write.
-As you type, Zed requests predictions from the edit prediction provider, which returns individual or multi-line suggestions you accept by pressing `tab`.
+Edit Prediction is how Kurocto's AI code completions work: an LLM predicts the code you want to write.
+As you type, Kurocto requests predictions from the edit prediction provider, which returns individual or multi-line suggestions you accept by pressing `tab`.
 
 Edit Prediction is off by default (`"provider": "none"`). To use it, configure one of the [supported providers](#other-providers), like GitHub Copilot, Mercury Coder, Codestral, or a [local model](#local-and-self-hosted-models).
 
@@ -29,7 +29,6 @@ Toggle between them via the `mode` key:
 
 Or directly via the UI through the status bar menu:
 
-![Edit Prediction status bar menu, with the modes toggle.](https://zed.dev/img/edit-prediction/status-bar-menu.webp)
 
 > Note that edit prediction modes work with any prediction provider.
 
@@ -119,11 +118,11 @@ If you configured edit prediction keybindings before Zed `v0.229.0`, your `keyma
 
 **Old tab workaround**: Before `unbind` existed, the only way to prevent `tab` from accepting edit predictions was to copy all the default non-edit-prediction `tab` bindings into your keymap alongside a custom `AcceptEditPrediction` binding. If your keymap still contains those copy-pasted entries, delete them and use a single `"unbind"` entry as shown in the examples above.
 
-**Renamed context**: The `edit_prediction_conflict` context has been replaced by `edit_prediction && (showing_completions || in_leading_whitespace)`. Zed automatically migrates any bindings that used `edit_prediction_conflict`, so no changes are required on your end.
+**Renamed context**: The `edit_prediction_conflict` context has been replaced by `edit_prediction && (showing_completions || in_leading_whitespace)`. Kurocto automatically migrates any bindings that used `edit_prediction_conflict`, so no changes are required on your end.
 
 ## Configuring the Prediction Debounce
 
-The prediction debounce controls how long Zed waits after you stop typing before automatically requesting an edit prediction. Configure it in milliseconds under the settings for your selected provider:
+The prediction debounce controls how long Kurocto waits after you stop typing before automatically requesting an edit prediction. Configure it in milliseconds under the settings for your selected provider:
 
 ```json [settings]
 {
@@ -188,7 +187,7 @@ To disable edit predictions for specific directories or files, set this in your 
 ```json [settings]
 {
   "edit_predictions": {
-    "disabled_globs": ["~/.config/zed/settings.json"]
+    "disabled_globs": ["~/.config/kurocto/settings.json"]
   }
 }
 ```
@@ -225,7 +224,7 @@ To sign in to GitHub Copilot, click on the Copilot icon in the status bar. A pop
 
 #### Using GitHub Copilot Enterprise
 
-If your organization uses GitHub Copilot Enterprise, you can configure Zed to use your enterprise instance by specifying the enterprise URI in your settings file ([how to edit](../configuring-zed.md#settings-files)):
+If your organization uses GitHub Copilot Enterprise, you can configure Kurocto to use your enterprise instance by specifying the enterprise URI in your settings file ([how to edit](../configuring-zed.md#settings-files)):
 
 ```json [settings]
 {
@@ -238,7 +237,7 @@ If your organization uses GitHub Copilot Enterprise, you can configure Zed to us
 Replace `"https://your.enterprise.domain"` with the URL provided by your GitHub Enterprise administrator (e.g., `https://foo.ghe.com`).
 
 This setting applies to both Copilot edit predictions and Copilot Chat.
-Once set, Zed routes Copilot requests through your enterprise endpoint.
+Once set, Kurocto routes Copilot requests through your enterprise endpoint.
 When you sign in by clicking the Copilot icon in the status bar, you are redirected to your configured enterprise URL to complete authentication.
 All other Copilot features and usage remain the same.
 
@@ -346,7 +345,7 @@ The `prompt_format` setting controls how code context is formatted for the model
 - `sweep` - [Sweep rewrite-window](https://blog.sweep.dev/posts/oss-next-edit) format using `<|file_sep|>` file blocks for related files, `original/...`, `current/...`, and `updated/...`.
 - `infer` - Auto-detect from model name (default)
 
-With `"prompt_format": "infer"`, Zed automatically uses Zeta 2 format for models named `zeta2` and Zeta 2.1 format for models named `zeta2.1`.
+With `"prompt_format": "infer"`, Kurocto automatically uses Zeta 2 format for models named `zeta2` and Zeta 2.1 format for models named `zeta2.1`.
 
 For example, to use Zeta 2 with Ollama:
 

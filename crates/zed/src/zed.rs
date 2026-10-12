@@ -109,7 +109,9 @@ use zed_actions::{
     OpenZedUrl, Quit,
 };
 
-const DOCS_URL: &str = "https://zed.dev/docs/";
+const ABOUT_MODIFICATION_NOTICE: &str =
+    "Kurocto is a modified version of Zed (https://github.com/zed-industries/zed).";
+const ABOUT_LICENSE_NOTICE: &str = "Licensed under GPL-3.0-or-later, with Apache-2.0 components. See Help > View Dependency Licenses.";
 const MANUAL_UPDATE_MESSAGE: &str = "This build does not update itself.";
 const MANUAL_UPDATE_DETAIL: &str =
     "It does not check for or download updates. New versions are installed manually.";
@@ -677,9 +679,10 @@ fn initialize_file_watcher(fs: &dyn Fs, window: &mut Window, cx: &mut Context<Wo
             db::indoc! {r#"
             inotify_init returned {}
 
-            This may be due to system-wide limits on inotify instances. For troubleshooting see: https://zed.dev/docs/linux
+            This may be due to system-wide limits on inotify instances. For troubleshooting see: {}
             "#},
-            e
+            e,
+            release_channel::docs_url("linux")
         );
         let prompt = window.prompt(
             PromptLevel::Critical,
@@ -691,7 +694,7 @@ fn initialize_file_watcher(fs: &dyn Fs, window: &mut Window, cx: &mut Context<Wo
         cx.spawn(async move |_, cx| {
             if prompt.await == Ok(0) {
                 cx.update(|cx| {
-                    cx.open_url("https://zed.dev/docs/linux#could-not-start-inotify");
+                    cx.open_url(&release_channel::docs_url("linux#could-not-start-inotify"));
                     cx.quit();
                 });
             }
@@ -708,9 +711,10 @@ fn initialize_file_watcher(fs: &dyn Fs, window: &mut Window, cx: &mut Context<Wo
             db::indoc! {r#"
             ReadDirectoryChangesW initialization failed: {}
 
-            This may occur on network filesystems and WSL paths. For troubleshooting see: https://zed.dev/docs/windows
+            This may occur on network filesystems and WSL paths. For troubleshooting see: {}
             "#},
-            e
+            e,
+            release_channel::docs_url("windows")
         );
         let prompt = window.prompt(
             PromptLevel::Critical,
@@ -722,7 +726,7 @@ fn initialize_file_watcher(fs: &dyn Fs, window: &mut Window, cx: &mut Context<Wo
         cx.spawn(async move |_, cx| {
             if prompt.await == Ok(0) {
                 cx.update(|cx| {
-                    cx.open_url("https://zed.dev/docs/windows");
+                    cx.open_url(&release_channel::docs_url("windows"));
                     cx.quit()
                 });
             }
@@ -740,19 +744,19 @@ fn show_software_emulation_warning_if_needed(
         let (graphics_api, docs_url, open_url) = if cfg!(target_os = "windows") {
             (
                 "DirectX",
-                "https://zed.dev/docs/windows",
-                "https://zed.dev/docs/windows",
+                release_channel::docs_url("windows"),
+                release_channel::docs_url("windows"),
             )
         } else {
             (
                 "Vulkan",
-                "https://zed.dev/docs/linux",
-                "https://zed.dev/docs/linux#zed-fails-to-open-windows",
+                release_channel::docs_url("linux"),
+                release_channel::docs_url("linux#kurocto-fails-to-open-windows"),
             )
         };
         let message = format!(
             db::indoc! {r#"
-            Zed uses {} for rendering and requires a compatible GPU.
+            Kurocto uses {} for rendering and requires a compatible GPU.
 
             Currently you are using a software emulated GPU ({}) which
             will result in awful performance.
@@ -772,7 +776,7 @@ fn show_software_emulation_warning_if_needed(
         cx.spawn(async move |_, cx| {
             if prompt.await == Ok(1) {
                 cx.update(|cx| {
-                    cx.open_url(open_url);
+                    cx.open_url(&open_url);
                     cx.quit();
                 });
             }
@@ -922,7 +926,7 @@ fn register_actions(
     cx: &mut Context<Workspace>,
 ) {
     workspace
-        .register_action(|_, _: &OpenDocs, _, cx| cx.open_url(DOCS_URL))
+        .register_action(|_, _: &OpenDocs, _, cx| cx.open_url(&release_channel::docs_url("")))
         .register_action(
             |workspace: &mut Workspace,
              _: &input_latency_ui::DumpInputLatencyHistogram,
@@ -1614,7 +1618,17 @@ fn open_about_window(cx: &mut App) {
                                     .color(Color::Muted)
                                     .size(LabelSize::XSmall),
                             )
-                            .child(Label::new(self.full_version.clone()).size(LabelSize::Small)),
+                            .child(Label::new(self.full_version.clone()).size(LabelSize::Small))
+                            .child(
+                                Label::new(ABOUT_MODIFICATION_NOTICE)
+                                    .color(Color::Muted)
+                                    .size(LabelSize::XSmall),
+                            )
+                            .child(
+                                Label::new(ABOUT_LICENSE_NOTICE)
+                                    .color(Color::Muted)
+                                    .size(LabelSize::XSmall),
+                            ),
                     )
                     .child(
                         h_flex()
@@ -1689,13 +1703,13 @@ fn open_about_window(cx: &mut App) {
 
     let window_size = Size {
         width: px(440.),
-        height: px(300.),
+        height: px(360.),
     };
 
     cx.open_window(
         WindowOptions {
             titlebar: Some(TitlebarOptions {
-                title: Some("About Zed".into()),
+                title: Some("About Kurocto".into()),
                 appears_transparent: true,
                 traffic_light_position: Some(point(px(12.), px(12.))),
             }),
@@ -2912,6 +2926,18 @@ mod tests {
             .unwrap();
 
         futures::future::join_all(all_tasks).await;
+    }
+
+    #[test]
+    fn test_about_window_notices() {
+        assert_eq!(
+            ABOUT_MODIFICATION_NOTICE,
+            "Kurocto is a modified version of Zed (https://github.com/zed-industries/zed)."
+        );
+        assert_eq!(
+            ABOUT_LICENSE_NOTICE,
+            "Licensed under GPL-3.0-or-later, with Apache-2.0 components. See Help > View Dependency Licenses."
+        );
     }
 
     #[gpui::test]

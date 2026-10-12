@@ -30,32 +30,11 @@ pub use rpc::*;
 pub use telemetry_events::Event;
 pub use user::*;
 
-static ZED_SERVER_URL: LazyLock<Option<String>> =
-    LazyLock::new(|| std::env::var("ZED_SERVER_URL").ok());
-
 pub static ZED_APP_PATH: LazyLock<Option<PathBuf>> =
     LazyLock::new(|| std::env::var("ZED_APP_PATH").ok().map(PathBuf::from));
 
 pub static ZED_ALWAYS_ACTIVE: LazyLock<bool> =
     LazyLock::new(|| std::env::var("ZED_ALWAYS_ACTIVE").is_ok_and(|e| !e.is_empty()));
-
-#[derive(Deserialize, RegisterSetting)]
-pub struct ClientSettings {
-    pub server_url: String,
-}
-
-impl Settings for ClientSettings {
-    fn from_settings(content: &settings::SettingsContent) -> Self {
-        if let Some(server_url) = &*ZED_SERVER_URL {
-            return Self {
-                server_url: server_url.clone(),
-            };
-        }
-        Self {
-            server_url: content.server_url.clone().unwrap(),
-        }
-    }
-}
 
 #[derive(Deserialize, Default, RegisterSetting)]
 pub struct ProxySettings {
@@ -207,7 +186,6 @@ impl Client {
         let clock = Arc::new(clock::RealSystemClock);
         let http = Arc::new(HttpClientWithUrl::new_url(
             cx.http_client(),
-            &ClientSettings::get_global(cx).server_url,
             cx.http_client().proxy().cloned(),
         ));
         Self::new(clock, http, cx)

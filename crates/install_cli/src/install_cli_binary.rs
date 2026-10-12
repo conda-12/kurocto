@@ -12,12 +12,12 @@ use workspace::{Toast, Workspace};
 actions!(
     cli,
     [
-        /// Installs the Zed CLI tool to the system PATH.
+        /// Installs the Kurocto CLI tool to the system PATH.
         InstallCliBinary,
     ]
 );
 
-const CANT_INSTALL_DOCS_URL: &str = "https://zed.dev/docs/macos#cant-install-cli";
+const CANT_INSTALL_DOCS_PAGE: &str = "macos#cant-install-cli";
 
 /// Attempts to install the CLI symlink. Returns the installed path on success,
 /// or `None` if the user dismissed the macOS administrator authentication
@@ -80,7 +80,7 @@ async fn install_script(cx: &AsyncApp) -> Result<Option<PathBuf>> {
 }
 
 pub fn install_cli_binary(window: &mut Window, cx: &mut Context<Workspace>) {
-    const LINUX_PROMPT_DETAIL: &str = "If you installed Zed from our official release add ~/.local/bin to your PATH.\n\nIf you installed Zed from a different source like your package manager, then you may need to create an alias/symlink manually.\n\nDepending on your package manager, the CLI might be named differently.";
+    const LINUX_PROMPT_DETAIL: &str = "If the CLI was installed to ~/.local/bin, add that directory to your PATH.\n\nIf you installed Kurocto from a different source like your package manager, then you may need to create an alias/symlink manually.\n\nDepending on your package manager, the CLI might be named differently.";
 
     cx.spawn_in(window, async move |workspace, cx| {
         if cfg!(any(target_os = "linux", target_os = "freebsd")) {
@@ -111,9 +111,9 @@ pub fn install_cli_binary(window: &mut Window, cx: &mut Context<Workspace>) {
                                     "You can add `kurocto` to your PATH manually.",
                                     cx,
                                 )
-                                .with_title("Couldn't install the Zed CLI")
+                                .with_title("Couldn't install the Kurocto CLI")
                                 .more_info_message("Show me how")
-                                .more_info_url(CANT_INSTALL_DOCS_URL)
+                                .more_info_url(release_channel::docs_url(CANT_INSTALL_DOCS_PAGE))
                             })
                         },
                     );
@@ -140,5 +140,5 @@ pub fn install_cli_binary(window: &mut Window, cx: &mut Context<Workspace>) {
         register_zed_scheme(cx).await.log_err();
         Ok(())
     })
-    .detach_and_prompt_err("Cannot install the Zed CLI", window, cx, |_, _, _| None);
+    .detach_and_prompt_err("Cannot install the Kurocto CLI", window, cx, |_, _, _| None);
 }

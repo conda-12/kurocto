@@ -61,11 +61,11 @@ use crate::headless::AgentCliAppState;
 #[derive(Parser, Debug)]
 #[command(
     name = "eval-cli",
-    about = "Run Zed's agent headlessly in evaluation/benchmark environments"
+    about = "Run Kurocto's agent headlessly in evaluation/benchmark environments"
 )]
 struct Args {
     /// Output current environment variables as JSON to stdout.
-    /// Used internally by Zed's shell environment capture.
+    /// Used internally by Kurocto's shell environment capture.
     #[arg(long, hide = true)]
     printenv: bool,
 

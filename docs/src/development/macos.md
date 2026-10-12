@@ -1,13 +1,13 @@
 ---
-title: Building Zed for macOS
-description: "Guide to building zed for macos for Zed development."
+title: Building Kurocto for macOS
+description: "Guide to building Kurocto for macos for Kurocto development."
 ---
 
-# Building Zed for macOS
+# Building Kurocto for macOS
 
 ## Repository
 
-Clone the [Zed repository](https://github.com/zed-industries/zed).
+Clone the [Kurocto repository](https://github.com/conda-12/kurocto).
 
 ## Dependencies
 
@@ -36,9 +36,9 @@ Clone the [Zed repository](https://github.com/zed-industries/zed).
   brew install cmake
   ```
 
-## Building Zed from Source
+## Building Kurocto from Source
 
-Once you have the dependencies installed, you can build Zed using [Cargo](https://doc.rust-lang.org/cargo/).
+Once you have the dependencies installed, you can build Kurocto using [Cargo](https://doc.rust-lang.org/cargo/).
 
 For a debug build:
 
@@ -60,7 +60,7 @@ cargo test --workspace
 
 ## Visual Regression Tests
 
-Zed includes visual regression tests that capture screenshots of real Zed windows and compare them against baseline images. These tests require macOS with Screen Recording permission.
+Kurocto includes visual regression tests that capture screenshots of real Kurocto windows and compare them against baseline images. These tests require macOS with Screen Recording permission.
 
 ### Prerequisites
 
@@ -108,34 +108,34 @@ UPDATE_BASELINE=1 cargo run -p zed --bin zed_visual_test_runner --features visua
 
 ## Sampling released builds
 
-How to get a symbolicated CPU profile from a released (non-dev) Zed instance.
-Use this when Zed is using a lot of CPU.
+How to get a symbolicated CPU profile from a released (non-dev) Kurocto instance.
+Use this when Kurocto is using a lot of CPU.
 
 Released macOS binaries are stripped of local symbols, so `sample` and Instruments show raw addresses for most frames.
-`script/bundle-mac` extracts the debug symbols into a local `zed.dwarf` file before stripping; they are not uploaded anywhere.
+`script/bundle-mac` extracts the debug symbols into a local `kurocto.dwarf` file before stripping; they are not uploaded anywhere.
 
 ### During the incident
 
-- Run `sample Zed 10 -f zed-sample.txt` (adjust the process name for Preview or Nightly).
+- Run `sample kurocto 10 -f kurocto-sample.txt` (adjust the process name for Preview or Nightly).
 - Get the exact build: type {#action zed::About} in the command palette and copy the version and commit.
 
-The `zed-sample.txt` file can be sent to Zed together with the exact version.
+The `kurocto-sample.txt` file can be shared together with the exact version.
 
 ### Later
 
-This can be done by Zed staff.
+This can be done by whoever kept the debug symbols for that build.
 
 - Find the binary UUID in the `Binary Images` section at the bottom of the sample output.
-- Find the `zed.dwarf` file that was kept for the build with that UUID.
+- Find the `kurocto.dwarf` file that was kept for the build with that UUID.
 - Resolve the addresses:
-  `atos -o zed.dwarf -l <load address> <address...>`
+  `atos -o kurocto.dwarf -l <load address> <address...>`
   Each unresolved frame in the sample output prints its `load address` and absolute address.
 
-To profile a released build on your own machine with full symbols, download the matching `zed.dwarf`, convert it into a `.dSYM` bundle Spotlight can index, and re-run `sample`:
+To profile a released build on your own machine with full symbols, download the matching `kurocto.dwarf`, convert it into a `.dSYM` bundle Spotlight can index, and re-run `sample`:
 
 ```sh
-mkdir -p Zed.dSYM/Contents/Resources/DWARF
-cp zed.dwarf Zed.dSYM/Contents/Resources/DWARF/zed
+mkdir -p Kurocto.dSYM/Contents/Resources/DWARF
+cp kurocto.dwarf Kurocto.dSYM/Contents/Resources/DWARF/kurocto
 ```
 
 Frames then resolve automatically, including file and line information.
@@ -209,18 +209,18 @@ This error seems to be caused by OS resource constraints. Installing and running
 
 ### Avoiding continual rebuilds
 
-If Zed continually rebuilds root crates, you may be opening the Zed codebase itself in your development build.
+If Kurocto continually rebuilds root crates, you may be opening the Kurocto codebase itself in your development build.
 
 This causes problems because `cargo run` exports a bunch of environment
 variables which are picked up by the `rust-analyzer` that runs in the development
-build of Zed. These environment variables are in turn passed to `cargo check`, which
+build of Kurocto. These environment variables are in turn passed to `cargo check`, which
 invalidates the build cache of some of the crates we depend on.
 
 To avoid this, run the built binary against a different project, for example `cargo run ~/path/to/other/project`.
 
 ### Speeding up verification
 
-If you build Zed frequently, macOS may keep verifying new builds, which can add a few seconds to each iteration.
+If you build Kurocto frequently, macOS may keep verifying new builds, which can add a few seconds to each iteration.
 
 To fix this, you can:
 

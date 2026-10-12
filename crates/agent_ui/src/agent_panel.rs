@@ -8,7 +8,7 @@ use agent_settings::UserAgentsMd;
 use collections::HashSet;
 use db::kvp::KeyValueStore;
 use itertools::Itertools;
-use project::agent_server_store::AllAgentServersSettings;
+use project::agent_server_store::{AllAgentServersSettings, NATIVE_AGENT_DISPLAY_NAME};
 use project::{AgentId, ProjectItem};
 use serde::{Deserialize, Serialize};
 
@@ -5871,7 +5871,7 @@ impl AgentPanel {
                 Some(ContextMenu::build(window, cx, |menu, _window, cx| {
                     menu.context(focus_handle.clone())
                         .item(
-                            ContextMenuEntry::new("Zed Agent")
+                            ContextMenuEntry::new(NATIVE_AGENT_DISPLAY_NAME)
                                 .when(
                                     !showing_terminal && is_agent_selected(Agent::NativeAgent),
                                     |this| this.action(Box::new(NewThread)),

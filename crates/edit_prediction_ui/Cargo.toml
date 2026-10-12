@@ -30,6 +30,7 @@ language.workspace = true
 multi_buffer.workspace = true
 paths.workspace = true
 project.workspace = true
+release_channel.workspace = true
 settings.workspace = true
 telemetry.workspace = true
 text.workspace = true

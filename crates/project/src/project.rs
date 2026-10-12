@@ -330,7 +330,7 @@ enum ProjectClientState {
 #[derive(PartialEq, Debug, Clone)]
 pub struct ToastLink {
     pub label: &'static str,
-    pub url: &'static str,
+    pub url: String,
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -1157,7 +1157,7 @@ pub enum PulledDiagnostics {
     },
 }
 
-/// Whether to disable all AI features in Zed.
+/// Whether to disable all AI features in Kurocto.
 ///
 /// Default: false
 #[derive(Copy, Clone, Debug, RegisterSetting)]
@@ -3943,7 +3943,7 @@ impl Project {
                         notification_id: format!("local-tasks-{path:?}").into(),
                         link: Some(ToastLink {
                             label: "Open Tasks Documentation",
-                            url: "https://zed.dev/docs/tasks",
+                            url: release_channel::docs_url("tasks"),
                         }),
                         message,
                     });

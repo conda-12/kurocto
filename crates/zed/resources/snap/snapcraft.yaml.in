@@ -2,10 +2,10 @@ name: kurocto
 title: Kurocto
 base: core24
 version: "$RELEASE_VERSION"
-summary: The editor for what's next
+summary: Code editor
 description: |
-  Zed is a modern open-source code editor, built from the ground up in Rust with
-  a GPU-accelerated renderer. We help you build software faster than ever before.
+  Kurocto is an open-source code editor built in Rust with a GPU-accelerated
+  renderer. It is a modified version of Zed.
 grade: stable
 confinement: classic
 compression: lzo
@@ -25,10 +25,10 @@ parts:
 
     stage-packages:
       - libasound2t64
-      # snapcraft has a lint that this is unused, but without it Zed exits with
+      # snapcraft has a lint that this is unused, but without it Kurocto exits with
       # "Missing Vulkan entry points: LibraryLoadFailure" in wgpu.
       - libvulkan1
-      # snapcraft has a lint that this is unused, but without it Zed exits with
+      # snapcraft has a lint that this is unused, but without it Kurocto exits with
       # "NoWaylandLib" when run with Wayland.
       - libwayland-client0
       - libxcb1

@@ -1,11 +1,11 @@
 ---
 title: Visual Customization
-description: "Various aspects of Zed's visual layout can be configured in the Settings Editor or settings file."
+description: "Various aspects of Kurocto's visual layout can be configured in the Settings Editor or settings file."
 ---
 
 # Visual Customization
 
-Various aspects of Zed's visual layout can be configured in the Settings Editor ({#kb zed::OpenSettings}) or in your settings file ({#kb zed::OpenSettingsFile}).
+Various aspects of Kurocto's visual layout can be configured in the Settings Editor ({#kb zed::OpenSettings}) or in your settings file ({#kb zed::OpenSettingsFile}).
 
 See [All Settings](./reference/all-settings.md) for additional information and other non-visual settings.
 
@@ -100,7 +100,7 @@ If you would like to use distinct themes for light mode/dark mode that can be se
 
 ### Font ligatures
 
-By default Zed enables font ligatures which will visually combine certain adjacent characters.
+By default Kurocto enables font ligatures which will visually combine certain adjacent characters.
 
 For example `=>` will be displayed as `→` and `!=` will be `≠`.
 This is purely cosmetic and the individual characters remain unchanged.
@@ -156,10 +156,10 @@ To disable this behavior use:
 
 ```json [settings]
 {
-  // Force usage of Zed build in path prompts (file and directory pickers)
+  // Force usage of Kurocto build in path prompts (file and directory pickers)
   // instead of OS native pickers (false).
   "use_system_path_prompts": true,
-  // Force usage of Zed built in confirmation prompts ("Do you want to save?")
+  // Force usage of Kurocto built in confirmation prompts ("Do you want to save?")
   // instead of OS native prompts (false). On linux this is ignored (always false).
   "use_system_prompts": true,
 
@@ -547,7 +547,7 @@ TBD: Centered layout related settings
 
 When `agent.flexible` is enabled, `agent.default_width` does not control the panel width. Double-clicking the panel’s outer resize handle restores the default proportion. Set `agent.flexible` to `false` to use `agent.default_width` as the reset width.
 
-See [Zed AI Documentation](./ai/overview.md) for additional non-visual AI settings.
+See [Kurocto AI Documentation](./ai/overview.md) for additional non-visual AI settings.
 
 ## Terminal Panel
 

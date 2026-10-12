@@ -39,7 +39,10 @@ use markdown::{
     CodeBlockRenderer, CopyButtonVisibility, Markdown, MarkdownElement, MarkdownFont, MarkdownStyle,
 };
 use parking_lot::{Mutex, RwLock};
-use project::{AgentId, AgentServerStore, Project, ProjectEntryId, ProjectPath};
+use project::{
+    AgentId, AgentServerStore, Project, ProjectEntryId, ProjectPath,
+    agent_server_store::NATIVE_AGENT_DISPLAY_NAME,
+};
 
 use crate::conversation_view::elicitation::{
     ElicitationCard, ElicitationCardHandlers, ElicitationFormState, should_render_elicitation,
@@ -3054,7 +3057,7 @@ impl ConversationView {
         cx: &mut Context<Self>,
     ) -> AnyElement {
         let (heading_label, description_label) = (
-            format!("Upgrade {} to work with Zed", self.agent.agent_id()),
+            format!("Upgrade {} to work with Kurocto", self.agent.agent_id()),
             if version.is_empty() {
                 format!(
                     "Currently using {}, which does not report a valid --version",
@@ -3214,9 +3217,13 @@ impl ConversationView {
         let root_work_dirs = root_thread.work_dirs().cloned();
         let root_title = self.title_override(cx).or_else(|| root_thread.title());
 
-        let title = root_title
-            .clone()
-            .unwrap_or_else(|| self.agent.agent_id().0);
+        let agent_id = self.agent.agent_id();
+        let title = root_title.clone().unwrap_or_else(|| {
+            self.agent_server_store
+                .read(cx)
+                .agent_display_name(&agent_id)
+                .unwrap_or(agent_id.0)
+        });
 
         match settings.notify_when_agent_waiting {
             NotifyWhenAgentWaiting::PrimaryScreen => {
@@ -3618,7 +3625,7 @@ fn native_available_skills(
 }
 
 fn placeholder_text(agent_name: &str, has_commands: bool) -> String {
-    if agent_name == agent::ZED_AGENT_ID.as_ref() {
+    if agent_name == NATIVE_AGENT_DISPLAY_NAME {
         format!(
             "Message the {}, @ to include context, / for commands",
             agent_name

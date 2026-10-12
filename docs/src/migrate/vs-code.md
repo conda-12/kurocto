@@ -1,31 +1,24 @@
 ---
-title: How to Migrate from VS Code to Zed
-description: "Guide for migrating from VS Code to Zed, including settings and keybindings."
+title: How to Migrate from VS Code to Kurocto
+description: "Guide for migrating from VS Code to Kurocto, including settings and keybindings."
 ---
 
-# How to Migrate from VS Code to Zed
+# How to Migrate from VS Code to Kurocto
 
-This guide explains how to move from VS Code to Zed without rebuilding your workflow.
+This guide explains how to move from VS Code to Kurocto without rebuilding your workflow.
 
 It covers which settings import automatically, which shortcuts map cleanly, and which behaviors differ so you can adjust quickly.
 
-## Install Zed
+## Install Kurocto
 
-Zed is available on macOS, Windows, and Linux.
+Kurocto does not have published builds or package manager packages yet. It is currently built from source; see the build guides for [macOS](../development/macos.md), [Linux](../development/linux.md), and [Windows](../development/windows.md).
 
-For macOS, you can download it from zed.dev/download, or install via Homebrew:
-`brew install --cask zed`
-
-For most Linux users, the easiest way to install Zed is through our installation script:
-`curl -f https://zed.dev/install.sh | sh`
-
-After installation, you can launch Zed from your Applications folder (macOS) or directly from the terminal (Linux) using:
-`zed .`
-This opens the current directory in Zed.
+After building and installing, you can open the current directory in Kurocto from the terminal using:
+`kurocto .`
 
 ## Import Settings from VS Code
 
-During setup, you have the option to import key settings from VS Code. Zed imports the following settings:
+During setup, you have the option to import key settings from VS Code. Kurocto imports the following settings:
 
 ### Settings Imported from VS Code
 
@@ -33,7 +26,7 @@ The following VS Code settings are automatically imported when you use **Import 
 
 **Editor**
 
-| VS Code Setting                             | Zed Setting                                    |
+| VS Code Setting                             | Kurocto Setting                                    |
 | ------------------------------------------- | ---------------------------------------------- |
 | `editor.fontFamily`                         | `buffer_font_family`                           |
 | `editor.fontSize`                           | `buffer_font_size`                             |
@@ -82,7 +75,7 @@ The following VS Code settings are automatically imported when you use **Import 
 
 **Files & Workspace**
 
-| VS Code Setting             | Zed Setting                    |
+| VS Code Setting             | Kurocto Setting                    |
 | --------------------------- | ------------------------------ |
 | `files.associations`        | `file_types`                   |
 | `files.autoSave`            | `autosave`                     |
@@ -96,7 +89,7 @@ The following VS Code settings are automatically imported when you use **Import 
 
 **Terminal**
 
-| VS Code Setting                       | Zed Setting                         |
+| VS Code Setting                       | Kurocto Setting                         |
 | ------------------------------------- | ----------------------------------- |
 | `terminal.integrated.fontFamily`      | `terminal.font_family`              |
 | `terminal.integrated.fontSize`        | `terminal.font_size`                |
@@ -111,7 +104,7 @@ The following VS Code settings are automatically imported when you use **Import 
 
 **Tabs & Panels**
 
-| VS Code Setting                                    | Zed Setting                                        |
+| VS Code Setting                                    | Kurocto Setting                                        |
 | -------------------------------------------------- | -------------------------------------------------- |
 | `workbench.editor.showTabs`                        | `tab_bar.show`                                     |
 | `workbench.editor.showIcons`                       | `tabs.file_icons`                                  |
@@ -128,7 +121,7 @@ The following VS Code settings are automatically imported when you use **Import 
 
 **Project Panel (File Explorer)**
 
-| VS Code Setting                | Zed Setting                         |
+| VS Code Setting                | Kurocto Setting                         |
 | ------------------------------ | ----------------------------------- |
 | `explorer.compactFolders`      | `project_panel.auto_fold_dirs`      |
 | `explorer.autoReveal`          | `project_panel.auto_reveal_entries` |
@@ -138,7 +131,7 @@ The following VS Code settings are automatically imported when you use **Import 
 
 **Git**
 
-| VS Code Setting                      | Zed Setting                                    |
+| VS Code Setting                      | Kurocto Setting                                    |
 | ------------------------------------ | ---------------------------------------------- |
 | `git.enabled`                        | `git_panel.button`                             |
 | `git.defaultBranchName`              | `git_panel.fallback_branch_name`               |
@@ -147,7 +140,7 @@ The following VS Code settings are automatically imported when you use **Import 
 
 **Window & Behavior**
 
-| VS Code Setting                                  | Zed Setting                              |
+| VS Code Setting                                  | Kurocto Setting                              |
 | ------------------------------------------------ | ---------------------------------------- |
 | `window.confirmBeforeClose`                      | `confirm_quit`                           |
 | `window.nativeTabs`                              | `use_system_window_tabs`                 |
@@ -156,7 +149,7 @@ The following VS Code settings are automatically imported when you use **Import 
 
 **Other**
 
-| VS Code Setting      | Zed Setting                                                  |
+| VS Code Setting      | Kurocto Setting                                                  |
 | -------------------- | ------------------------------------------------------------ |
 | `http.proxy`         | `proxy`                                                      |
 | `npm.packageManager` | `node.npm_path`                                              |
@@ -164,7 +157,7 @@ The following VS Code settings are automatically imported when you use **Import 
 | `chat.agent.enabled` | `agent.enabled`                                              |
 | `mcp`                | `context_servers`                                            |
 
-Zed doesn’t import extensions or keybindings, but this import gets core editor behavior close to your VS Code setup. If you skip that step during setup, you can still import settings manually later via the command palette:
+Kurocto doesn’t import extensions or keybindings, but this import gets core editor behavior close to your VS Code setup. If you skip that step during setup, you can still import settings manually later via the command palette:
 
 `Cmd+Shift+P → {#action zed::ImportVsCodeSettings}`
 
@@ -174,25 +167,25 @@ You can configure most settings in the Settings Editor ({#kb zed::OpenSettings})
 
 Here’s how common VS Code settings translate:
 
-| VS Code             | Zed                | Notes                         |
+| VS Code             | Kurocto                | Notes                         |
 | ------------------- | ------------------ | ----------------------------- |
-| editor.fontFamily   | buffer_font_family | Zed uses Zed Mono by default  |
+| editor.fontFamily   | buffer_font_family | Kurocto uses Zed Mono by default  |
 | editor.fontSize     | buffer_font_size   | Set in pixels                 |
 | editor.tabSize      | tab_size           | Can override per language     |
 | editor.insertSpaces | insert_spaces      | Boolean                       |
 | editor.formatOnSave | format_on_save     | Works with formatter enabled  |
 | editor.wordWrap     | soft_wrap          | Supports optional wrap column |
 
-Zed also supports per-project settings. You can find these in the Settings Editor as well.
+Kurocto also supports per-project settings. You can find these in the Settings Editor as well.
 
 ## Open or Create a Project
 
 After setup, press `Cmd+O` (`Ctrl+O` on Linux) to open a folder. By default, new folders open in the current window's threads sidebar, letting you work on multiple projects without juggling windows. See [Windows & Projects](../windows-and-projects.md) for details on managing multiple projects and opening in new windows.
 
-To start a new project, create a directory using your terminal or file manager, then open it in Zed. The editor will treat that folder as the root of your project.
+To start a new project, create a directory using your terminal or file manager, then open it in Kurocto. The editor will treat that folder as the root of your project.
 
-You can also launch Zed from the terminal inside any folder with:
-`zed .`
+You can also launch Kurocto from the terminal inside any folder with:
+`kurocto .`
 
 Once inside a project, use `Cmd+P` to jump between files quickly. `Cmd+Shift+P` (`Ctrl+Shift+P` on Linux) opens the command palette for running actions / tasks or toggling settings.
 
@@ -203,7 +196,7 @@ Open buffers appear as tabs across the top. The Project Panel shows your file tr
 If you chose the VS Code keymap during onboarding, most shortcuts should already feel familiar.
 Here’s a quick reference for where keybindings match and where they differ.
 
-### Common Shared Keybindings (Zed <> VS Code)
+### Common Shared Keybindings (Kurocto <> VS Code)
 
 | Action                      | Shortcut               |
 | --------------------------- | ---------------------- |
@@ -224,16 +217,16 @@ Here’s a quick reference for where keybindings match and where they differ.
 | Navigate open tabs          | `Cmd + Opt + Arrow`    |
 | Syntactic fold / unfold     | `Cmd + Opt + {` or `}` |
 
-### Different Keybindings (Zed <> VS Code)
+### Different Keybindings (Kurocto <> VS Code)
 
-| Action              | VS Code               | Zed                    |
+| Action              | VS Code               | Kurocto                    |
 | ------------------- | --------------------- | ---------------------- |
 | Open recent project | `Ctrl + R`            | `Cmd + Opt + O`        |
 | Move lines up/down  | `Opt + Up/Down`       | `Cmd + Ctrl + Up/Down` |
 | Split panes         | `Cmd + \`             | `Cmd + K, Arrow Keys`  |
 | Expand Selection    | `Shift + Alt + Right` | `Opt + Up`             |
 
-### Unique to Zed
+### Unique to Kurocto
 
 | Action              | Shortcut                     | Notes                                            |
 | ------------------- | ---------------------------- | ------------------------------------------------ |
@@ -249,16 +242,16 @@ To edit your keybindings:
 
 This opens a list of all available bindings. You can override individual shortcuts, remove conflicts, or build a layout that works better for your setup.
 
-Zed also supports chords (multi-key sequences) like `Cmd+K Cmd+C`, like VS Code does.
+Kurocto also supports chords (multi-key sequences) like `Cmd+K Cmd+C`, like VS Code does.
 
 ## Differences in User Interfaces
 
 ### Projects and Windows
 
 VS Code uses a dedicated Workspace concept, with multi-root folders, `.code-workspace` files, and a clear distinction between “a window” and “a workspace.”
-Zed takes a different approach.
+Kurocto takes a different approach.
 
-In Zed:
+In Kurocto:
 
 - **Multiple projects in one window**: You can open multiple folders in the same window. Each appears in the threads sidebar on the left, and you can switch between them while preserving your layout and agent threads. See [Windows & Projects](../windows-and-projects.md).
 
@@ -268,18 +261,18 @@ In Zed:
 
 - **Per-project settings are optional**: You can add a `.zed/settings.json` file inside a project to override global settings.
 
-- **You can start from a single file or an empty window**: Zed doesn’t require you to open a folder to begin editing.
+- **You can start from a single file or an empty window**: Kurocto doesn’t require you to open a folder to begin editing.
 
 The result is flexibility without complexity: multiple projects per window via the sidebar, or multiple folders per project via Add Folder to Project.
 
 ### Navigating in a Project
 
 In VS Code, the standard entry point is opening a folder. From there, the left-hand panel is central to navigation.
-Zed takes a different approach:
+Kurocto takes a different approach:
 
 - You can still open folders, but you don’t need to. Opening a single file or even starting with an empty workspace is valid.
 - The [Command Palette](../command-palette.md) (`Cmd+Shift+P`) and File Finder (`Cmd+P`) are primary navigation tools. The File Finder searches files, symbols, and commands across the workspace.
-- Instead of a persistent panel, Zed encourages you to:
+- Instead of a persistent panel, Kurocto encourages you to:
   - Fuzzy-find files by name (`Cmd+P`)
   - Jump directly to symbols (`Cmd+Shift+O`)
   - Use split panes and tabs for context, rather than keeping a large file tree open (though you can do this with the Project Panel if you prefer).
@@ -288,9 +281,9 @@ The UI keeps auxiliary panels out of the way so navigation stays centered on cod
 
 ### Extensions vs. Marketplace
 
-Zed does not offer as many extensions as VS Code. The available extensions are focused on language support, themes, syntax highlighting, and other core editing enhancements.
+Kurocto does not offer as many extensions as VS Code. The available extensions are focused on language support, themes, syntax highlighting, and other core editing enhancements.
 
-Several features that typically require extensions in VS Code are built into Zed:
+Several features that typically require extensions in VS Code are built into Kurocto:
 
 - AI coding assistance (no Copilot extension needed)
 - Built-in terminal panel
@@ -298,11 +291,11 @@ Several features that typically require extensions in VS Code are built into Zed
 - Task runner with JSON config
 - Inline diagnostics and code actions via LSP
 
-You won’t find one-to-one replacements for every VS Code extension, especially if you rely on tools for DevOps, containers, or test runners. Zed's extension catalog is still growing and remains smaller.
+You won’t find one-to-one replacements for every VS Code extension, especially if you rely on tools for DevOps, containers, or test runners. Kurocto's extension catalog is still growing and remains smaller.
 
-### Using AI in Zed
+### Using AI in Kurocto
 
-If you’re used to GitHub Copilot in VS Code, you can do the same in Zed. You can also bring your own API keys or use external agents. You can disable AI features entirely if you prefer.
+If you’re used to GitHub Copilot in VS Code, you can do the same in Kurocto. You can also bring your own API keys or use external agents. You can disable AI features entirely if you prefer.
 
 #### Configuring GitHub Copilot
 
@@ -311,18 +304,18 @@ If you’re used to GitHub Copilot in VS Code, you can do the same in Zed. You c
 3. Click **Configure** next to "Configure Providers"
 4. Under **GitHub Copilot**, click **Sign in to GitHub**
 
-Once signed in, just start typing. Zed will offer suggestions inline for you to accept.
+Once signed in, just start typing. Kurocto will offer suggestions inline for you to accept.
 
 #### Additional AI Options
 
-To use other AI models in Zed, you have several options:
+To use other AI models in Kurocto, you have several options:
 
-- Bring your own [API keys](https://zed.dev/docs/ai/use-api-access.html)
-- Use [External Agents like Claude Agent](https://zed.dev/docs/ai/external-agents.html).
+- Bring your own [API keys](../ai/use-api-access.md)
+- Use [External Agents like Claude Agent](../ai/external-agents.md).
 
 ### Advanced Config and Productivity Tweaks
 
-Zed exposes advanced settings for power users who want to fine-tune their environment.
+Kurocto exposes advanced settings for power users who want to fine-tune their environment.
 
 Here are a few useful tweaks:
 
@@ -350,4 +343,4 @@ Here are a few useful tweaks:
 ```
 
 **Bring over custom snippets**
-Copy your VS Code snippet JSON directly into Zed's snippets folder ({#action snippets::ConfigureSnippets}).
+Copy your VS Code snippet JSON directly into Kurocto's snippets folder ({#action snippets::ConfigureSnippets}).

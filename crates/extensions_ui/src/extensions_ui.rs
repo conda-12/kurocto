@@ -1145,7 +1145,7 @@ impl ExtensionsPage {
     fn render_feature_upsell_banner(
         &self,
         label: &'static str,
-        docs_url: &'static str,
+        docs_page: &'static str,
         vim: bool,
         cx: &Context<Self>,
     ) -> impl IntoElement {
@@ -1153,12 +1153,13 @@ impl ExtensionsPage {
             .end_icon(Icon::new(IconName::ArrowUpRight).size(IconSize::Small))
             .on_click({
                 move |_event, _window, cx| {
+                    let docs_url = release_channel::docs_url(docs_page);
                     telemetry::event!(
                         "Documentation Viewed",
                         source = "Feature Upsell",
                         url = docs_url,
                     );
-                    cx.open_url(docs_url)
+                    cx.open_url(&docs_url)
                 }
             });
 
@@ -1219,110 +1220,110 @@ impl ExtensionsPage {
     fn render_feature_upsells(&self, cx: &Context<Self>) -> impl IntoElement {
         v_flex().children(self.upsells.iter().map(|feature| match feature {
             Feature::AgentClaude => self.render_feature_upsell_banner(
-                "Claude Agent support is built-in to Zed!",
-                "https://zed.dev/docs/ai/external-agents#claude-agent",
+                "Claude Agent support is built-in to Kurocto!",
+                "ai/external-agents#claude-agent",
                 false,
                 cx,
             ),
             Feature::AgentCodex => self.render_feature_upsell_banner(
-                "Codex CLI support is built-in to Zed!",
-                "https://zed.dev/docs/ai/external-agents#codex-cli",
+                "Codex CLI support is built-in to Kurocto!",
+                "ai/external-agents#codex-cli",
                 false,
                 cx,
             ),
             Feature::AgentGemini => self.render_feature_upsell_banner(
-                "Gemini CLI support is built-in to Zed!",
-                "https://zed.dev/docs/ai/external-agents#gemini-cli",
+                "Gemini CLI support is built-in to Kurocto!",
+                "ai/external-agents#gemini-cli",
                 false,
                 cx,
             ),
             Feature::ExtensionBasedpyright => self.render_feature_upsell_banner(
-                "Basedpyright (Python language server) support is built-in to Zed!",
-                "https://zed.dev/docs/languages/python#basedpyright",
+                "Basedpyright (Python language server) support is built-in to Kurocto!",
+                "languages/python#basedpyright",
                 false,
                 cx,
             ),
             Feature::ExtensionRuff => self.render_feature_upsell_banner(
-                "Ruff (linter for Python) support is built-in to Zed!",
-                "https://zed.dev/docs/languages/python#code-formatting--linting",
+                "Ruff (linter for Python) support is built-in to Kurocto!",
+                "languages/python#code-formatting--linting",
                 false,
                 cx,
             ),
             Feature::ExtensionTailwind => self.render_feature_upsell_banner(
-                "Tailwind CSS support is built-in to Zed!",
-                "https://zed.dev/docs/languages/tailwindcss",
+                "Tailwind CSS support is built-in to Kurocto!",
+                "languages/tailwindcss",
                 false,
                 cx,
             ),
             Feature::ExtensionTy => self.render_feature_upsell_banner(
-                "Ty (Python language server) support is built-in to Zed!",
-                "https://zed.dev/docs/languages/python",
+                "Ty (Python language server) support is built-in to Kurocto!",
+                "languages/python",
                 false,
                 cx,
             ),
             Feature::Git => self.render_feature_upsell_banner(
-                "Zed comes with basic Git support—more features are coming in the future.",
-                "https://zed.dev/docs/git",
+                "Kurocto comes with basic Git support—more features are coming in the future.",
+                "git",
                 false,
                 cx,
             ),
             Feature::LanguageBash => self.render_feature_upsell_banner(
-                "Shell support is built-in to Zed!",
-                "https://zed.dev/docs/languages/bash",
+                "Shell support is built-in to Kurocto!",
+                "languages/bash",
                 false,
                 cx,
             ),
             Feature::LanguageC => self.render_feature_upsell_banner(
-                "C support is built-in to Zed!",
-                "https://zed.dev/docs/languages/c",
+                "C support is built-in to Kurocto!",
+                "languages/c",
                 false,
                 cx,
             ),
             Feature::LanguageCpp => self.render_feature_upsell_banner(
-                "C++ support is built-in to Zed!",
-                "https://zed.dev/docs/languages/cpp",
+                "C++ support is built-in to Kurocto!",
+                "languages/cpp",
                 false,
                 cx,
             ),
             Feature::LanguageGo => self.render_feature_upsell_banner(
-                "Go support is built-in to Zed!",
-                "https://zed.dev/docs/languages/go",
+                "Go support is built-in to Kurocto!",
+                "languages/go",
                 false,
                 cx,
             ),
             Feature::LanguagePython => self.render_feature_upsell_banner(
-                "Python support is built-in to Zed!",
-                "https://zed.dev/docs/languages/python",
+                "Python support is built-in to Kurocto!",
+                "languages/python",
                 false,
                 cx,
             ),
             Feature::LanguageReact => self.render_feature_upsell_banner(
-                "React support is built-in to Zed!",
-                "https://zed.dev/docs/languages/typescript",
+                "React support is built-in to Kurocto!",
+                "languages/typescript",
                 false,
                 cx,
             ),
             Feature::LanguageRust => self.render_feature_upsell_banner(
-                "Rust support is built-in to Zed!",
-                "https://zed.dev/docs/languages/rust",
+                "Rust support is built-in to Kurocto!",
+                "languages/rust",
                 false,
                 cx,
             ),
             Feature::LanguageTypescript => self.render_feature_upsell_banner(
-                "Typescript support is built-in to Zed!",
-                "https://zed.dev/docs/languages/typescript",
+                "Typescript support is built-in to Kurocto!",
+                "languages/typescript",
                 false,
                 cx,
             ),
             Feature::OpenIn => self.render_feature_upsell_banner(
-                "Zed supports linking to a source line on GitHub and others.",
-                "https://zed.dev/docs/git#git-integrations",
+                "Kurocto supports linking to a source line on GitHub and others.",
+                "git#git-integrations",
                 false,
                 cx,
             ),
             Feature::Vim => self.render_feature_upsell_banner(
-                "Vim support is built-in to Zed!",
-                "https://zed.dev/docs/vim",
+                "Vim support is built-in to Kurocto!",
+                "vim",
                 true,
                 cx,
             ),

@@ -28,6 +28,7 @@ menu.workspace = true
 path.workspace = true
 project.workspace = true
 proto.workspace = true
+release_channel.workspace = true
 serde_json.workspace = true
 settings.workspace = true
 telemetry.workspace = true
@@ -41,7 +42,6 @@ zed_actions.workspace = true
 
 [dev-dependencies]
 editor = { workspace = true, features = ["test-support"] }
-release_channel.workspace = true
 gpui = { workspace = true, features = ["test-support"] }
 semver.workspace = true
 util = { workspace = true, features = ["test-support"] }

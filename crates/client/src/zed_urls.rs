@@ -1,60 +1,17 @@
-//! Contains helper functions for constructing URLs to various Zed-related pages.
-//!
-//! These URLs will adapt to the configured server URL in order to construct
-//! links appropriate for the environment (e.g., by linking to a local copy of
-//! zed.dev in development).
+//! Contains helper functions for constructing URLs to documentation pages.
 
-use gpui::App;
-use release_channel::ReleaseChannel;
-use settings::Settings;
-
-use crate::ClientSettings;
-
-fn server_url(cx: &App) -> &str {
-    &ClientSettings::get_global(cx).server_url
-}
-
-fn docs_url(cx: &App) -> String {
-    let server_url = server_url(cx);
-    match ReleaseChannel::try_global(cx).unwrap_or_default() {
-        ReleaseChannel::Stable => {
-            format!("{server_url}/docs")
-        }
-        ReleaseChannel::Preview => {
-            format!("{server_url}/docs/preview")
-        }
-        ReleaseChannel::Dev | ReleaseChannel::Nightly => {
-            format!("{server_url}/docs/nightly")
-        }
-    }
-}
-
-/// Returns the URL to Zed's Agent sandboxing documentation.
+/// Returns the URL to the Agent sandboxing documentation.
 ///
 /// Pass `section` to deep-link to a specific section anchor on the page (for
 /// example, `Some("installing-bubblewrap")`); pass `None` to link to the top of
 /// the page.
-///
-/// Unlike the other links here, this targets `zed.dev/docs` (via
-/// [`release_channel::docs_url`]) rather than the configured `server_url`: the
-/// docs are a static site hosted on `zed.dev`, so pointing at a local dev
-/// `server_url` would 404.
-pub fn sandboxing_docs(section: Option<&str>, cx: &App) -> String {
-    let base = release_channel::docs_url("ai/sandboxing", cx);
+pub fn sandboxing_docs(section: Option<&str>) -> String {
     match section {
-        Some(section) => format!("{base}#{section}"),
-        None => base,
+        Some(section) => release_channel::docs_url(&format!("ai/sandboxing#{section}")),
+        None => release_channel::docs_url("ai/sandboxing"),
     }
 }
 
-pub fn llm_provider_docs(cx: &App) -> String {
-    format!("{docs_url}/ai/llm-providers", docs_url = docs_url(cx))
-}
-
-/// Returns the URL to Zed's ACP registry blog post.
-pub fn acp_registry_blog(cx: &App) -> String {
-    format!(
-        "{server_url}/blog/acp-registry",
-        server_url = server_url(cx)
-    )
+pub fn llm_provider_docs() -> String {
+    release_channel::docs_url("ai/llm-providers")
 }

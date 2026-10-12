@@ -9083,7 +9083,7 @@ impl Render for GenerateCommitMessageConfigurationTooltip {
                                 )
                                 .label_size(LabelSize::Small)
                                 .on_click(move |_, _, cx| {
-                                    cx.open_url(&zed_urls::llm_provider_docs(cx))
+                                    cx.open_url(&zed_urls::llm_provider_docs())
                                 }),
                         ),
                 )

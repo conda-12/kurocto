@@ -1,16 +1,16 @@
 ---
-title: AI Privacy - Zed
-description: Understand how Zed handles AI prompts, code context, provider data boundaries, and privacy controls.
+title: AI Privacy - Kurocto
+description: Understand how Kurocto handles AI prompts, code context, provider data boundaries, and privacy controls.
 ---
 
 # AI Privacy
 
-This page explains the privacy and trust boundaries for AI features in Zed,
-including [Zed Agent](./zed-agent.md), [Edit Prediction](./edit-prediction.md),
+This page explains the privacy and trust boundaries for AI features in Kurocto,
+including [Kurocto Agent](./zed-agent.md), [Edit Prediction](./edit-prediction.md),
 [Inline Assistant](./inline-assistant.md), and
 [Git commit generation](../git.md#ai-support-in-git).
 
-Zed does not retain your prompts or code context. Model requests are handled by
+Kurocto does not retain your prompts or code context. Model requests are handled by
 the provider, gateway, local server, or agent you configure, under its own
 terms.
 
@@ -18,15 +18,15 @@ terms.
 
 | Path                                                         | Who handles model requests                        | What to know                                                                                                                                        | Details                                                                                           |
 | ------------------------------------------------------------ | ------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------- |
-| [Provider API keys](./use-api-access.md)                     | The configured provider                           | The provider handles requests under its own terms. Provider keys saved through Zed are stored in the system keychain, not in `settings.json`.       | [Use API Access](./use-api-access.md)                                                             |
+| [Provider API keys](./use-api-access.md)                     | The configured provider                           | The provider handles requests under its own terms. Provider keys saved through Kurocto are stored in the system keychain, not in `settings.json`.       | [Use API Access](./use-api-access.md)                                                             |
 | [Existing subscriptions](./use-an-existing-subscription.md)  | The subscription provider                         | The provider handles requests under the subscription terms.                                                                                         | [Use an Existing Subscription](./use-an-existing-subscription.md)                                 |
 | [Gateways](./use-a-gateway.md)                               | The configured gateway and upstream providers     | The gateway and upstream providers handle requests under their own terms.                                                                           | [Use a Gateway](./use-a-gateway.md)                                                               |
 | [Local models](./use-a-local-model.md)                       | The local server or self-hosted endpoint          | The local server handles requests according to how you configured that server.                                                                      | [Use a Local Model](./use-a-local-model.md)                                                       |
 | [External Agents](./external-agents.md)                      | The External Agent and its configured providers   | The External Agent handles model requests under its own terms. Tool and MCP behavior depends on agent and ACP configuration.                        | [External Agents](./external-agents.md)                                                           |
 | [Terminal Threads](./terminal-threads.md)                    | The CLI or TUI running in the terminal            | The CLI or TUI owns its auth, model routing, tools, instructions, MCP configuration, and data handling.                                             | [Terminal Threads](./terminal-threads.md)                                                         |
 | [Edit Prediction](./edit-prediction.md)                      | The selected edit prediction provider             | Each keystroke can send local editing context to the selected provider. Providers follow their own terms.                                           | [Edit Prediction](./edit-prediction.md)                                                           |
-| [Agent tools](./tools.md), [MCP](./mcp.md), and integrations | Zed, configured MCP servers, and external systems | Tools can read, edit, search, run commands, fetch URLs, or call external systems depending on profile, MCP server, and tool permission settings.    | [Agent Profiles](./agent-profiles.md), [Tool Permissions](./tool-permissions.md), [MCP](./mcp.md) |
-| Project trust and instructions                               | Zed and the trusted worktree                      | Project-local instructions and skills are loaded from trusted worktrees. External Agents and Terminal Threads may read their own instruction files. | [Worktree Trust](../worktree-trust.md), [Skills](./skills.md), [Instructions](./instructions.md)  |
+| [Agent tools](./tools.md), [MCP](./mcp.md), and integrations | Kurocto, configured MCP servers, and external systems | Tools can read, edit, search, run commands, fetch URLs, or call external systems depending on profile, MCP server, and tool permission settings.    | [Agent Profiles](./agent-profiles.md), [Tool Permissions](./tool-permissions.md), [MCP](./mcp.md) |
+| Project trust and instructions                               | Kurocto and the trusted worktree                      | Project-local instructions and skills are loaded from trusted worktrees. External Agents and Terminal Threads may read their own instruction files. | [Worktree Trust](../worktree-trust.md), [Skills](./skills.md), [Instructions](./instructions.md)  |
 
 ## Provider Safety Retention for Designated Models {#provider-safety-retention}
 
@@ -34,11 +34,11 @@ Some providers require limited data retention for specific models as a condition
 of offering them, on every platform where those models are available. Anthropic
 retains prompts and outputs for models it designates as Covered Models, including
 Claude Fable 5.1 and Claude Fable 5, for at least 30 days for trust and safety
-purposes. Zed cannot opt out of this retention; it applies wherever these models
+purposes. Kurocto cannot opt out of this retention; it applies wherever these models
 are served. See
 [Anthropic's data retention practices for Covered Models](https://support.claude.com/en/articles/15425996-data-retention-practices-for-covered-models).
 
-Zed does not retain your prompts or outputs for these models. Retention happens
+Kurocto does not retain your prompts or outputs for these models. Retention happens
 at the provider, under the provider's documented access controls and deletion
 timelines.
 
@@ -51,8 +51,5 @@ on every platform where those models are offered.
 ## Controls and Related Privacy Docs {#controls-and-related-privacy-docs}
 
 - [Telemetry](../telemetry.md): The optional local event log and local crash
-  diagnostics. Zed does not send telemetry.
+  diagnostics. Kurocto does not send telemetry.
 - [AI Quick Start](./quick-start.md#turn-ai-off): How to turn AI off.
-- [Privacy Policy](https://zed.dev/privacy-policy): Zed's privacy policy.
-- [Subprocessors](https://zed.dev/subprocessors): Zed's subprocessors.
-- [Terms of Service](https://zed.dev/terms): Zed's terms.

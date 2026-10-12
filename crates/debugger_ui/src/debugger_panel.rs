@@ -654,7 +654,7 @@ impl DebugPanel {
         let documentation_button = || {
             IconButton::new("debug-open-documentation", IconName::CircleHelp)
                 .icon_size(IconSize::Small)
-                .on_click(move |_, _, cx| cx.open_url("https://zed.dev/docs/debugger"))
+                .on_click(move |_, _, cx| cx.open_url(&release_channel::docs_url("debugger")))
                 .tooltip(Tooltip::text("Open Documentation"))
         };
 
@@ -1826,7 +1826,9 @@ impl Render for DebugPanel {
                                         .size(IconSize::Small)
                                         .color(Color::Muted),
                                 )
-                                .on_click(|_, _, cx| cx.open_url("https://zed.dev/docs/debugger")),
+                                .on_click(|_, _, cx| {
+                                    cx.open_url(&release_channel::docs_url("debugger"))
+                                }),
                         )
                         .child(
                             Button::new(
