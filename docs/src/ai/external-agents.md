@@ -11,8 +11,6 @@ Use [Terminal Threads](./terminal-threads.md) instead when you want to run a CLI
 
 External Agents run through their own process and provider relationship. Billing, legal terms, retention, and data handling are between you and the agent provider. Zed does not charge for External Agents.
 
-For Zed-hosted models and Zed-managed AI features, see [AI Privacy](./privacy-and-security.md) and [Feedback and Training Data](./ai-improvement.md).
-
 ## Install from the ACP Registry {#registry}
 
 The ACP Registry is the primary way to install common External Agents in Zed.

@@ -14,7 +14,7 @@ Open it with {#action agent::NewThread} from [the Command Palette](../command-pa
 
 If you're using the Agent Panel for the first time, configure either a model for the [Zed Agent](./zed-agent.md) or an [External Agent](./external-agents.md).
 
-- Use [LLM Providers](./llm-providers.md) for Zed-hosted models, API access, subscriptions, gateways, and local models.
+- Use [LLM Providers](./llm-providers.md) for API access, subscriptions, gateways, and local models.
 - Use [External Agents](./external-agents.md) for ACP-integrated agents.
 - Use [AI Quick Start](./quick-start.md) if you are not sure which path to choose.
 
@@ -169,9 +169,9 @@ Configure automatic compaction with `agent.auto_compact`. See [Agent Settings](.
 
 ## Changing Models {#changing-models}
 
-After you've configured your LLM providers—either via [API access](./use-api-access.md) or through [Zed-hosted models](../account/zed-hosted-models.md)—you can switch between their models by clicking on the model selector on the message editor or by using the {#kb agent::ToggleModelSelector} keybinding.
+After you've configured your [LLM providers](./llm-providers.md), you can switch between their models by clicking on the model selector on the message editor or by using the {#kb agent::ToggleModelSelector} keybinding.
 
-> The same model can be offered via multiple providers - for example, Claude Sonnet 4.5 is available via Zed Pro, OpenRouter, Anthropic directly, and more.
+> The same model can be offered via multiple providers - for example, Claude Sonnet 4.5 is available via OpenRouter, Anthropic directly, and more.
 > Make sure you've selected the correct model **_provider_** for the model you'd like to use, delineated by the logo to the left of the model in the model selector.
 
 ### Favoriting Models
@@ -194,8 +194,6 @@ Tool calling needs to be individually supported by each model and model provider
 Therefore, despite the presence of built-in tools, some models may not have the ability to pick them up.
 You should see a "No tools" label if you select a model that falls into this case.
 
-All [Zed-hosted models](../account/zed-hosted-models.md) support tool calling out-of-the-box.
-
 ### MCP Servers {#mcp-servers}
 
 Similarly to the built-in tools, some models may not support all tools included in a given MCP Server.
@@ -205,21 +203,4 @@ Zed's UI will inform you about this via a warning icon that appears close to the
 
 If you hit an error or unusual LLM behavior, open the thread as Markdown with {#action agent::OpenActiveThreadAsMarkdown} and attach it to your GitHub issue.
 
-You can also open threads as Markdown by clicking on the file icon button, to the right of the thumbs down button, when focused on the panel's editor.
-
-## Feedback {#feedback}
-
-You can rate agent responses to help improve Zed's system prompt and tools.
-
-> **Warning:** Rating an AI response sends the conversation thread to Zed. The
-> conversation thread includes your messages, AI responses, and thread metadata.
-> See [Feedback and Training Data](./ai-improvement.md) and
-> [AI Privacy](./privacy-and-security.md) for more information.
-> **_If you don't want data persisted on Zed's servers, don't rate_**.
-> We will not collect data for improving Zed's agent experience without you
-> explicitly rating responses.
-
-To help improve Zed's system prompt and tools, rate responses with the thumbs up/down controls at the end of each response.
-In case of a thumbs down, a new text area will show up where you can add more specifics about what happened.
-
-You can provide feedback on the thread at any point after the agent responds, and multiple times within the same thread.
+You can also open threads as Markdown with the **Open Thread as Markdown** entry in the [context menu](#context-menu).

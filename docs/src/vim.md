@@ -283,8 +283,6 @@ These ex commands open Zed's various panels and windows.
 | Command                      | Default Shortcut |
 | ---------------------------- | ---------------- |
 | Open the project panel       | `:E[xplore]`     |
-| Open the collaboration panel | `:C[ollab]`      |
-| Open the chat panel          | `:Ch[at]`        |
 | Open the AI panel            | `:A[I]`          |
 | Open the git panel           | `:G[it]`         |
 | Open the debug panel         | `:D[ebug]`       |
@@ -455,7 +453,7 @@ Here's a template with useful vim mode contexts to help you customize your vim m
     }
   },
   {
-    "context": "EmptyPane || SharedScreen",
+    "context": "EmptyPane",
     "bindings": {
       // Put key bindings here (in addition to the context above) if you want them to
       // work when no editor exists.

@@ -255,14 +255,12 @@ Some window managers, such as `Hyprland`, don't provide a file picker by default
 
 ### Zed isn't remembering my API keys
 
-### Zed isn't remembering my login
-
 This feature also requires XDG desktop portals, specifically:
 
 - `org.freedesktop.portal.Secret` or
 - `org.freedesktop.Secrets`
 
-Zed needs a place to securely store secrets such as your Zed login cookie or your OpenAI API Keys and we use a system provided keychain to do this. Examples of packages that provide this are `gnome-keyring`, `KWallet` and `keepassxc` among others.
+Zed needs a place to securely store secrets such as your OpenAI API Keys and we use a system provided keychain to do this. Examples of packages that provide this are `gnome-keyring`, `KWallet` and `keepassxc` among others.
 
 ### Could not start inotify
 

@@ -8,7 +8,7 @@ description: Zed's code completions from language servers and edit predictions. 
 Zed supports two sources for completions:
 
 1. "Code Completions" provided by Language Servers (LSPs) automatically installed by Zed or via [Zed Language Extensions](languages.md).
-2. "Edit Predictions" provided by Zed's own Zeta model or by external providers like [GitHub Copilot](#github-copilot).
+2. "Edit Predictions" provided by an edit prediction provider like [GitHub Copilot](./ai/edit-prediction.md#github-copilot).
 
 ## Language Server Code Completions {#code-completions}
 
@@ -31,7 +31,7 @@ For more information, see:
 
 ## Edit Predictions {#edit-predictions}
 
-Zed has built-in support for predicting multiple edits at a time [via Zeta](https://huggingface.co/zed-industries/zeta), Zed's open-source and open-data model.
-Edit predictions appear as you type, and most of the time, you can accept them by pressing `tab`.
+Zed supports predicting multiple edits at a time through an edit prediction provider.
+Once a provider is configured, edit predictions appear as you type, and most of the time, you can accept them by pressing `tab`.
 
 See the [edit predictions documentation](./ai/edit-prediction.md) for more information on how to setup and configure Zed's edit predictions.

@@ -73,26 +73,6 @@ You can export this component list as follows:
 - Click on `More` in the `Installed` tab
 - Click on `Export configuration`
 
-### Notes
-
-Update `pg_hba.conf` in the `data` directory to use `trust` instead of `scram-sha-256` for the `host` method. Otherwise, the connection fails with `password authentication failed`. The file is typically at `C:\Program Files\PostgreSQL\17\data\pg_hba.conf`. After the change, it should look like this:
-
-```conf
-# IPv4 local connections:
-host    all             all             127.0.0.1/32            trust
-# IPv6 local connections:
-host    all             all             ::1/128                 trust
-```
-
-If you are using a non-Latin Windows locale, set the `lc_messages` parameter in `postgresql.conf` (in the `data` directory) to `English_United States.1252` (or another UTF-8-compatible encoding available on your system). Otherwise, the database may panic. The file should look like this:
-
-```conf
-# lc_messages = 'Chinese (Simplified)_China.936' # locale for system error message strings
-lc_messages = 'English_United States.1252'
-```
-
-After this, restart the `postgresql` service. Press `Win`+`R` to open the Run dialog, enter `services.msc`, and select **OK**. In Services Manager, find `postgresql-x64-XX`, right-click it, and select **Restart**.
-
 ## Building from source
 
 Once you have the dependencies installed, you can build Zed using [Cargo](https://doc.rust-lang.org/cargo/).

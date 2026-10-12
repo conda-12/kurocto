@@ -7,10 +7,7 @@ description: "What data Zed collects and how to control telemetry settings."
 
 Zed collects anonymous telemetry to understand usage patterns and diagnose issues.
 
-Telemetry falls into two categories:
-
-- **Client-side**: Usage metrics and crash reports. You can disable these in settings.
-- **Server-side**: Collected when using hosted services like AI or Collaboration. Required for these features to function.
+Telemetry consists of usage metrics and crash reports. You can disable these in settings.
 
 ## Configuring Telemetry Settings
 
@@ -52,23 +49,11 @@ Client-side telemetry includes:
 
 This data does not include your code or sensitive project details. Events are sent over HTTPS and rate-limited.
 
-Usage data is tied to a random telemetry ID. If you've authenticated, this ID may be linked to your email so Zed can analyze patterns over time and reach out for feedback.
+Usage data is tied to a random telemetry ID.
 
 To audit what Zed has reported, run {#action zed::OpenTelemetryLog} from the command palette or click `Help > View Telemetry Log`.
 
 For the full list of event types, see the `Event` enum in [telemetry_events.rs](https://github.com/zed-industries/zed/blob/main/crates/telemetry_events/src/telemetry_events.rs).
-
-### Server-Side Metrics
-
-When using Zed's hosted services, we collect metadata for rate limiting and billing (e.g., token usage). Zed does not store your prompts or code unless you explicitly share feedback or opt into Edit Prediction training data collection.
-
-For details on AI request paths and opt-in data sharing, see [AI Privacy](./ai/privacy-and-security.md) and [Feedback and Training Data](./ai/ai-improvement.md).
-
-## Zed Business
-
-Administrators on Zed Business can enforce a no-sharing policy org-wide; members can't opt into [Edit Prediction training data sharing](./ai/ai-improvement.md#edit-predictions) or [AI feedback ratings](./ai/ai-improvement.md#ai-feedback-with-ratings). See [Data Sharing](./business/admin-controls.md#data-sharing) in Admin Controls.
-
-<!-- TODO: link to telemetry org-wide disable control once it ships (currently planned for a future release) -->
 
 ## Concerns and Questions
 

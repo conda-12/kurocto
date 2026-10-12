@@ -1,6 +1,6 @@
 ---
 title: AI Agent Tools - Zed
-description: Built-in tools for Zed's AI agent including file editing, code search, terminal commands, web search, skills, and diagnostics.
+description: Built-in tools for Zed's AI agent including file editing, code search, terminal commands, skills, and diagnostics.
 ---
 
 # Tools
@@ -57,11 +57,9 @@ Reads the content of a specified file in the project, allowing access to file co
 
 ### `search_web`
 
-Searches the web for information, providing results with snippets and links from relevant web pages, useful for accessing real-time information.
+Searches the web for information, providing results with snippets and links from relevant web pages.
 
-**Example:** Looking up whether a known bug in a dependency has been patched in a recent release, or finding the current API signature for a third-party library when the local docs are out of date.
-
-> **Note:** The built-in `search_web` tool is only available to [Zed Pro](https://zed.dev/pricing) subscribers using the Zed provider. If you're on a free plan or using a different provider, you can get equivalent functionality by connecting an MCP server that provides web search capabilities. See [MCP servers](./mcp.md) for details.
+> **Note:** The built-in `search_web` tool is only available when a web search provider is registered, and Zed does not ship one. To get equivalent functionality, connect an MCP server that provides web search capabilities. See [MCP servers](./mcp.md) for details.
 
 ## Edit Tools
 

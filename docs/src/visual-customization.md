@@ -127,7 +127,6 @@ To disable this behavior use:
   // Individual status bar icons can be hidden:
   // "project_panel": {"button": false },
   // "outline_panel": {"button": false },
-  // "collaboration_panel": {"button": false },
   // "git_panel": {"button": false },
 
   // "agent": {"button": false },
@@ -147,9 +146,7 @@ To disable this behavior use:
     "show_worktree_name": true,       // Show/hide worktree name
     "show_project_items": true,       // Show/hide project host and name
     "show_onboarding_banner": true,   // Show/hide onboarding banners
-    "show_user_picture": true,        // Show/hide user avatar
     "show_user_menu": true,           // Show/hide app user button
-    "show_sign_in": true,             // Show/hide sign-in button
     "show_menus": false,              // Show/hide menus
     "open_menus_on_hover": false      // Automatically open menus on hover
   },
@@ -630,18 +627,4 @@ See [Terminal settings](./reference/all-settings.md#terminal) for additional non
     },
     "multi_buffer_hide_symbols": false  // Hide symbols in multi-buffer views (show only files)
   }
-```
-
-## Collaboration Panels
-
-```json [settings]
-{
-  // Collaboration Panel
-  "collaboration_panel": {
-    "button": true, // Show/hide status bar icon
-    "dock": "left", // Where to dock: left, right
-    "default_width": 240 // Default width of the collaboration panel.
-  },
-  "show_call_status_icon": true // Shown call status in the OS status bar.
-}
 ```

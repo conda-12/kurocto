@@ -228,10 +228,6 @@ single step, and a failure in one of the operations does not block the rest.
 
 ### Limitations
 
-- Undo and redo are not available when collaborating in a project shared by
-  someone else. The same applies to {#action project_panel::Trash}, so when
-  working as a guest in a shared project, files can only be permanently
-  deleted, and file operations cannot be undone.
 - Operations whose result is a path excluded from the project via the
   `file_scan_exclusions` setting are not recorded. For example, with
   `**/*.secret` excluded, creating a file named `token.secret`, or renaming an

@@ -855,21 +855,11 @@ For the case of "open", regular selection behavior can be achieved by holding `a
 
 - Description: Which edit prediction provider to use
 - Setting: `provider`
-- Default: `"zed"`
+- Default: `"none"`
 
 **Options**
 
-1. Use Zeta as the edit prediction provider:
-
-```json [settings]
-{
-  "edit_predictions": {
-    "provider": "zed"
-  }
-}
-```
-
-2. Use Copilot as the edit prediction provider:
+1. Use Copilot as the edit prediction provider:
 
 ```json [settings]
 {
@@ -879,7 +869,7 @@ For the case of "open", regular selection behavior can be achieved by holding `a
 }
 ```
 
-3. Turn off edit predictions across all providers
+2. Turn off edit predictions across all providers
 
 ```json [settings]
 {
@@ -919,7 +909,7 @@ Relative patterns are matched against paths relative to the worktree root. Absol
 
 - Description: How long Zed waits after you stop typing before automatically requesting an edit prediction.
 - Setting: `edit_predictions.<provider>.prediction_debounce`
-- Default: `75` for GitHub Copilot, `150` for Codestral, and `0` for Zed, Mercury, Ollama, and OpenAI-compatible APIs.
+- Default: `75` for GitHub Copilot, `150` for Codestral, and `0` for Mercury, Ollama, and OpenAI-compatible APIs.
 
 **Options**
 
@@ -1270,7 +1260,7 @@ Set `[]` to clear the inherited list. Omit this setting to inherit it unchanged.
 - Setting: `cursors`
 - Default: `true`
 
-Cursor indicators appear as small marks on the scrollbar showing where other collaborators' cursors are positioned in the file.
+Cursor indicators appear as small marks on the scrollbar showing where cursors are positioned in the file.
 
 **Options**
 
@@ -4376,16 +4366,6 @@ Examples:
 - Searching for "function" would match "function", "Function", "FUNCTION", etc.
 - Searching for "Function" would only match "Function", not "function" or "FUNCTION"
 
-## Show Call Status Icon
-
-- Description: Whether or not to show the call status icon in the status bar.
-- Setting: `show_call_status_icon`
-- Default: `true`
-
-**Options**
-
-`boolean` values
-
 ## Completions
 
 - Description: Controls how completions are processed for this language.
@@ -5485,9 +5465,7 @@ Run the {#action theme_selector::Toggle} action in the command palette to see a 
     "show_worktree_name": true,
     "show_project_items": true,
     "show_onboarding_banner": true,
-    "show_user_picture": true,
     "show_user_menu": true,
-    "show_sign_in": true,
     "show_menus": false,
     "open_menus_on_hover": false,
     "button_layout": "platform_default"
@@ -5502,9 +5480,7 @@ Run the {#action theme_selector::Toggle} action in the command palette to see a 
 - `show_worktree_name`: Whether to show the worktree name button in the titlebar
 - `show_project_items`: Whether to show the project host and name in the titlebar
 - `show_onboarding_banner`: Whether to show onboarding banners in the titlebar
-- `show_user_picture`: Whether to show user picture in the titlebar
-- `show_user_menu`: Whether to show the user menu button in the titlebar (the one that displays your avatar by default and contains options like Settings, Keymap, Themes, etc.)
-- `show_sign_in`: Whether to show the sign in button in the titlebar
+- `show_user_menu`: Whether to show the user menu button in the titlebar (the one that contains options like Settings, Keymap, Themes, etc.)
 - `show_menus`: Whether to show the menus in the titlebar
 - `open_menus_on_hover`: Whether to open title-bar menus on hover. Once a menu is open, hovering always switches between menus.
 - `button_layout`: The layout of window control buttons in the title bar (Linux only). Can be set to `"platform_default"` to follow the system setting, `"standard"` to use Zed's built-in layout, or a custom format like `"close:minimize,maximize"`
@@ -5512,8 +5488,7 @@ Run the {#action theme_selector::Toggle} action in the command palette to see a 
 ## Window Title Format
 
 - Description: Template for the window title. Use `${separator}` to insert a
-  separator that is omitted when adjacent variables are empty. The collaboration
-  indicator, when present, is appended after the rendered template. If the
+  separator that is omitted when adjacent variables are empty. If the
   template renders to nothing (for example `${branch}` outside a Git
   repository), the default template is used instead.
 - Setting: `window_title_format`
@@ -6052,28 +6027,6 @@ Visit [AI Quick Start](../ai/quick-start.md) under the AI section to learn more 
 
 `boolean` values
 
-## Collaboration Panel
-
-- Description: Customizations for the collaboration panel.
-- Setting: `collaboration_panel`
-- Default:
-
-```json [settings]
-{
-  "collaboration_panel": {
-    "button": true,
-    "dock": "right",
-    "default_width": 240
-  }
-}
-```
-
-**Options**
-
-- `button`: Whether to show the collaboration panel button in the status bar
-- `dock`: Where to dock the collaboration panel. Can be `left` or `right`
-- `default_width`: Default width of the collaboration panel
-
 ## Debugger
 
 - Description: Configuration for debugger panel and settings
@@ -6225,23 +6178,6 @@ You can define these in user or project settings; project settings are merged on
       "show": null
     },
     "multi_buffer_hide_symbols": false
-  }
-}
-```
-
-## Calls
-
-- Description: Customize behavior when participating in a call
-- Setting: `calls`
-- Default:
-
-```json [settings]
-{
-  "calls": {
-    // Join calls with the microphone live by default
-    "mute_on_join": false,
-    // Share your project when you are the first to join a channel
-    "share_on_join": false
   }
 }
 ```

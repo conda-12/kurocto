@@ -195,7 +195,7 @@ To start a new project, create a directory using your terminal or file manager, 
 You can also launch Zed from the terminal inside any folder with:
 `zed .`
 
-Once inside a project, use `Cmd+P` to jump between files quickly. `Cmd+Shift+P` (`Ctrl+Shift+P` on Linux) opens the command palette for running actions / tasks, toggling settings, or starting a collaboration session.
+Once inside a project, use `Cmd+P` to jump between files quickly. `Cmd+Shift+P` (`Ctrl+Shift+P` on Linux) opens the command palette for running actions / tasks or toggling settings.
 
 Open buffers appear as tabs across the top. The Project Panel shows your file tree and Git status. Collapse it with `Cmd+B` for a distraction-free view.
 
@@ -293,7 +293,6 @@ Zed does not offer as many extensions as VS Code. The available extensions are f
 
 Several features that typically require extensions in VS Code are built into Zed:
 
-- Real-time collaboration with voice and cursor sharing (no Live Share required)
 - AI coding assistance (no Copilot extension needed)
 - Built-in terminal panel
 - Project-wide fuzzy search
@@ -302,21 +301,9 @@ Several features that typically require extensions in VS Code are built into Zed
 
 You won’t find one-to-one replacements for every VS Code extension, especially if you rely on tools for DevOps, containers, or test runners. Zed's extension catalog is still growing and remains smaller.
 
-### Collaboration in Zed vs. VS Code
-
-Unlike VS Code, Zed doesn’t require an extension to collaborate. It’s built into the core experience.
-
-- Open the Collab Panel in the left dock.
-- Create a channel and [invite your collaborators](https://zed.dev/docs/collaboration#inviting-a-collaborator) to join.
-- [Share your screen or your codebase](https://zed.dev/docs/collaboration#share-a-project) directly.
-
-Once connected, you’ll see each other's cursors, selections, and edits in real time. Voice chat is included, so you can talk as you work. There’s no need for separate tools or third-party logins.
-
-Learn how [Zed uses Zed](https://zed.dev/blog/zed-is-our-office) to plan work and collaborate.
-
 ### Using AI in Zed
 
-If you’re used to GitHub Copilot in VS Code, you can do the same in Zed. You can also explore other agents through Zed Pro, or bring your own keys and connect without authentication. You can disable AI features entirely if you prefer.
+If you’re used to GitHub Copilot in VS Code, you can do the same in Zed. You can also bring your own API keys or use external agents. You can disable AI features entirely if you prefer.
 
 #### Configuring GitHub Copilot
 
@@ -331,8 +318,7 @@ Once signed in, just start typing. Zed will offer suggestions inline for you to 
 
 To use other AI models in Zed, you have several options:
 
-- Use Zed’s hosted models, with higher rate limits. Requires [authentication](https://zed.dev/docs/authentication) and access through [Zed Pro](https://zed.dev/docs/account/zed-hosted-models.html).
-- Bring your own [API keys](https://zed.dev/docs/ai/use-api-access.html), no authentication needed
+- Bring your own [API keys](https://zed.dev/docs/ai/use-api-access.html)
 - Use [External Agents like Claude Agent](https://zed.dev/docs/ai/external-agents.html).
 
 ### Advanced Config and Productivity Tweaks
