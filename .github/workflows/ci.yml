@@ -23,7 +23,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - name: Check formatting
         run: cargo fmt --all -- --check
       - name: Check crate licenses
@@ -34,7 +34,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 120
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - name: Free disk space
         run: ./script/ci-free-disk-space
       - name: Use the CI cargo config
@@ -55,7 +55,7 @@ jobs:
     runs-on: macos-latest
     timeout-minutes: 120
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - name: Use the CI cargo config
         run: |
           mkdir -p ../.cargo
@@ -72,20 +72,20 @@ jobs:
     runs-on: windows-latest
     timeout-minutes: 120
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: Swatinem/rust-cache@v2
         with:
           shared-key: windows
           cache-targets: false
       - name: Check
-        run: cargo check --package zed --package cli --package remote_server
+        run: cargo check --package zed --package cli --package remote_server --package explorer_command_injector
 
   tests_linux:
     name: Tests (Linux, core crates)
     runs-on: ubuntu-latest
     timeout-minutes: 120
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - name: Free disk space
         run: ./script/ci-free-disk-space
       - name: Use the CI cargo config
