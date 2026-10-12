@@ -1,15 +1,14 @@
 #!/usr/bin/env sh
 set -eu
 
-# Downloads a tarball from https://zed.dev/releases and unpacks it
-# into ~/.local/. If you'd prefer to do this manually, instructions are at
-# https://zed.dev/docs/linux.
+# Unpacks a locally built Linux bundle (ZED_BUNDLE_PATH, as produced by
+# script/bundle-linux) into ~/.local/. It does not download anything; see
+# script/install-linux.
 
 main() {
     platform="$(uname -s)"
     arch="$(uname -m)"
     channel="${ZED_CHANNEL:-stable}"
-    ZED_VERSION="${ZED_VERSION:-latest}"
     # Use TMPDIR if available (for environments with non-standard temp directories)
     if [ -n "${TMPDIR:-}" ] && [ -d "${TMPDIR}" ]; then
         temp="$(mktemp -d "$TMPDIR/zed-XXXXXX")"
@@ -17,42 +16,25 @@ main() {
         temp="$(mktemp -d "/tmp/zed-XXXXXX")"
     fi
 
-    if [ "$platform" = "Darwin" ]; then
-        platform="macos"
-    elif [ "$platform" = "Linux" ]; then
-        platform="linux"
-    else
-        echo "Unsupported platform $platform"
+    if [ "$platform" != "Linux" ]; then
+        echo "Unsupported platform $platform: this script only installs a locally built Linux bundle"
         exit 1
     fi
 
-    case "$platform-$arch" in
-        macos-arm64* | linux-arm64* | linux-aarch64)
+    case "$arch" in
+        arm64* | aarch64)
             arch="aarch64"
             ;;
-        macos-x86* | linux-x86*)
+        x86*)
             arch="x86_64"
             ;;
         *)
-            echo "Unsupported platform or architecture"
+            echo "Unsupported architecture"
             exit 1
             ;;
     esac
 
-    if command -v curl >/dev/null 2>&1; then
-        curl () {
-            command curl -fL "$@"
-        }
-    elif command -v wget >/dev/null 2>&1; then
-        curl () {
-            wget -O- "$@"
-        }
-    else
-        echo "Could not find 'curl' or 'wget' in your path"
-        exit 1
-    fi
-
-    "$platform" "$@"
+    linux "$@"
 
     if [ "$(command -v zed)" = "$HOME/.local/bin/zed" ]; then
         echo "Zed has been installed. Run with 'zed'"
@@ -79,12 +61,11 @@ main() {
 }
 
 linux() {
-    if [ -n "${ZED_BUNDLE_PATH:-}" ]; then
-        cp "$ZED_BUNDLE_PATH" "$temp/zed-linux-$arch.tar.gz"
-    else
-        echo "Downloading Zed version: $ZED_VERSION"
-        curl "https://cloud.zed.dev/releases/$channel/$ZED_VERSION/download?asset=zed&arch=$arch&os=linux&source=install.sh" > "$temp/zed-linux-$arch.tar.gz"
+    if [ -z "${ZED_BUNDLE_PATH:-}" ]; then
+        echo "ZED_BUNDLE_PATH is not set. Build a bundle with script/bundle-linux and set ZED_BUNDLE_PATH to the resulting tarball, or run script/install-linux."
+        exit 1
     fi
+    cp "$ZED_BUNDLE_PATH" "$temp/zed-linux-$arch.tar.gz"
 
     suffix=""
     if [ "$channel" != "stable" ]; then
@@ -148,24 +129,6 @@ linux() {
     fi
     sed -i "s|Icon=zed|Icon=$HOME/.local/zed$suffix.app/share/icons/hicolor/512x512/apps/zed.png|g" "${desktop_file_path}"
     sed -i "s|Exec=zed|Exec=$HOME/.local/zed$suffix.app/bin/zed|g" "${desktop_file_path}"
-}
-
-macos() {
-    echo "Downloading Zed version: $ZED_VERSION"
-    curl "https://cloud.zed.dev/releases/$channel/$ZED_VERSION/download?asset=zed&os=macos&arch=$arch&source=install.sh" > "$temp/Zed-$arch.dmg"
-    hdiutil attach -quiet "$temp/Zed-$arch.dmg" -mountpoint "$temp/mount"
-    app="$(cd "$temp/mount/"; echo *.app)"
-    echo "Installing $app"
-    if [ -d "/Applications/$app" ]; then
-        echo "Removing existing $app"
-        rm -rf "/Applications/$app"
-    fi
-    ditto "$temp/mount/$app" "/Applications/$app"
-    hdiutil detach -quiet "$temp/mount"
-
-    mkdir -p "$HOME/.local/bin"
-    # Link the binary
-    ln -sf "/Applications/$app/Contents/MacOS/cli" "$HOME/.local/bin/zed"
 }
 
 main "$@"

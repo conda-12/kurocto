@@ -50,7 +50,6 @@ pub struct DockerConnectionOptions {
     pub name: String,
     pub container_id: String,
     pub remote_user: String,
-    pub upload_binary_over_docker_exec: bool,
     pub use_podman: bool,
     pub remote_env: BTreeMap<String, String>,
 }
@@ -241,110 +240,36 @@ impl DockerExecConnection {
             )
             .await
             .is_ok();
-        #[cfg(any(debug_assertions, feature = "build-remote-server-binary"))]
-        if let Some(remote_server_path) = super::build_remote_server_from_source(
+        let Some(remote_server_path) = super::local_server_binary(
             &remote_platform,
             delegate.as_ref(),
             binary_exists_on_server,
+            &dst_path,
             cx,
         )
         .await?
-        {
-            let tmp_path = paths::remote_server_dir_relative().join(
-                RelPath::from_unix_str(&format!(
-                    "download-{}-{}",
-                    std::process::id(),
-                    remote_server_path.file_name().unwrap().to_string_lossy()
-                ))
-                .unwrap(),
-            );
-            self.upload_local_server_binary(
-                &remote_server_path,
-                &tmp_path,
-                &remote_dir_for_server,
-                delegate,
-                cx,
-            )
-            .await?;
-            self.extract_server_binary(&dst_path, &tmp_path, &remote_dir_for_server, delegate, cx)
-                .await?;
+        else {
             return Ok(dst_path.into());
-        }
+        };
 
-        if binary_exists_on_server {
-            return Ok(dst_path.into());
-        }
-
-        let wanted_version = cx.update(|cx| match release_channel {
-            ReleaseChannel::Nightly => Ok(None),
-            ReleaseChannel::Dev => {
-                anyhow::bail!(
-                    "ZED_BUILD_REMOTE_SERVER is not set and no remote server exists at ({:?})",
-                    dst_path
-                )
-            }
-            _ => Ok(Some(AppVersion::global(cx))),
-        })?;
-
-        let tmp_path_gz = paths::remote_server_dir_relative().join(
+        let tmp_path = paths::remote_server_dir_relative().join(
             RelPath::from_unix_str(&format!(
-                "{}-download-{}.gz",
-                binary_name,
-                std::process::id()
+                "download-{}-{}",
+                std::process::id(),
+                remote_server_path.file_name().unwrap().to_string_lossy()
             ))
             .unwrap(),
         );
-        if !self.connection_options.upload_binary_over_docker_exec
-            && let Some(url) = delegate
-                .get_download_url(remote_platform, release_channel, wanted_version.clone(), cx)
-                .await?
-        {
-            match self
-                .download_binary_on_server(&url, &tmp_path_gz, &remote_dir_for_server, delegate, cx)
-                .await
-            {
-                Ok(_) => {
-                    self.extract_server_binary(
-                        &dst_path,
-                        &tmp_path_gz,
-                        &remote_dir_for_server,
-                        delegate,
-                        cx,
-                    )
-                    .await
-                    .context("extracting server binary")?;
-                    return Ok(dst_path.into());
-                }
-                Err(e) => {
-                    log::error!(
-                        "Failed to download binary on server, attempting to download locally and then upload it the server: {e:#}",
-                    )
-                }
-            }
-        }
-
-        let src_path = delegate
-            .download_server_binary_locally(remote_platform, release_channel, wanted_version, cx)
-            .await
-            .context("downloading server binary locally")?;
         self.upload_local_server_binary(
-            &src_path,
-            &tmp_path_gz,
+            &remote_server_path,
+            &tmp_path,
             &remote_dir_for_server,
             delegate,
             cx,
         )
-        .await
-        .context("uploading server binary")?;
-        self.extract_server_binary(
-            &dst_path,
-            &tmp_path_gz,
-            &remote_dir_for_server,
-            delegate,
-            cx,
-        )
-        .await
-        .context("extracting server binary")?;
+        .await?;
+        self.extract_server_binary(&dst_path, &tmp_path, &remote_dir_for_server, delegate, cx)
+            .await?;
         Ok(dst_path.into())
     }
 
@@ -567,79 +492,6 @@ impl DockerExecConnection {
     ) -> Result<String> {
         let args = self.docker_exec_arguments(inner_program, working_directory, env, program_args);
         self.run_docker_command("exec", args.as_ref()).await
-    }
-
-    async fn download_binary_on_server(
-        &self,
-        url: &str,
-        tmp_path_gz: &RelPath,
-        remote_dir_for_server: &str,
-        delegate: &Arc<dyn RemoteClientDelegate>,
-        cx: &mut AsyncApp,
-    ) -> Result<()> {
-        if let Some(parent) = tmp_path_gz.parent() {
-            self.run_docker_exec(
-                "mkdir",
-                Some(remote_dir_for_server),
-                &Default::default(),
-                &["-p", parent.display(self.path_style()).as_ref()],
-            )
-            .await?;
-        }
-
-        delegate.set_status(Some("Downloading remote development server on host"), cx);
-
-        match self
-            .run_docker_exec(
-                "curl",
-                Some(remote_dir_for_server),
-                &Default::default(),
-                &[
-                    "-f",
-                    "-L",
-                    url,
-                    "-o",
-                    &tmp_path_gz.display(self.path_style()),
-                ],
-            )
-            .await
-        {
-            Ok(_) => {}
-            Err(e) => {
-                if self
-                    .run_docker_exec("which", None, &Default::default(), &["curl"])
-                    .await
-                    .is_ok()
-                {
-                    return Err(e);
-                }
-
-                log::info!("curl is not available, trying wget");
-                match self
-                    .run_docker_exec(
-                        "wget",
-                        Some(remote_dir_for_server),
-                        &Default::default(),
-                        &[url, "-O", &tmp_path_gz.display(self.path_style())],
-                    )
-                    .await
-                {
-                    Ok(_) => {}
-                    Err(e) => {
-                        if self
-                            .run_docker_exec("which", None, &Default::default(), &["wget"])
-                            .await
-                            .is_ok()
-                        {
-                            return Err(e);
-                        } else {
-                            anyhow::bail!("Neither curl nor wget is available");
-                        }
-                    }
-                }
-            }
-        }
-        Ok(())
     }
 
     fn kill_inner(&self) -> Result<()> {
@@ -1187,7 +1039,6 @@ mod tests {
                 name: "container".to_string(),
                 container_id: "container_id".to_string(),
                 remote_user: "user".to_string(),
-                upload_binary_over_docker_exec: false,
                 use_podman: false,
                 remote_env: remote_env
                     .iter()

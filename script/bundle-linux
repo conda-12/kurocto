@@ -127,7 +127,7 @@ trap 'rm -rf "$temp_dir"' EXIT
 zed_dir="${temp_dir}/zed$suffix.app"
 
 # Cargo may reuse its outputs on the next invocation. Strip packaging copies
-# so reruns still upload full ELFs and extract complete debug companions.
+# so reruns still extract complete debug companions.
 mkdir -p "${zed_dir}/bin" "${zed_dir}/libexec"
 llvm-objcopy --strip-unneeded "${target_dir}/${target_triple}/release/zed" "${zed_dir}/libexec/zed-editor"
 llvm-objcopy --strip-debug --discard-all "${target_dir}/${target_triple}/release/cli" "${zed_dir}/bin/zed"

@@ -11,7 +11,6 @@ use http::{HeaderName, HeaderValue};
 
 use futures::future::BoxFuture;
 use parking_lot::Mutex;
-use serde::Serialize;
 #[cfg(feature = "test-support")]
 use std::{any::type_name, fmt};
 use std::{ops::Deref, sync::Arc, time::Duration};
@@ -275,19 +274,6 @@ impl HttpClientWithUrl {
     /// Builds a URL using the given path.
     pub fn build_url(&self, path: &str) -> String {
         format!("{}{}", self.base_url(), path)
-    }
-
-    /// Builds a Zed Cloud URL using the given path and query params.
-    pub fn build_zed_cloud_url_with_query(&self, path: &str, query: impl Serialize) -> Result<Url> {
-        let base_url = self.base_url();
-        let base_api_url = match base_url.as_ref() {
-            "https://zed.dev" => "https://cloud.zed.dev",
-            "https://staging.zed.dev" => "https://cloud.zed.dev",
-            "http://localhost:3000" => "http://localhost:8787",
-            other => other,
-        };
-        let query = serde_urlencoded::to_string(&query)?;
-        Ok(Url::parse(&format!("{}{}?{}", base_api_url, path, query))?)
     }
 }
 

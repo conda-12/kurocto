@@ -1,17 +1,17 @@
 ---
 title: Update Zed
-description: "Zed is designed to keep itself up to date automatically. You can always update this behavior in your settings."
+description: "Zed does not update itself. New versions are installed manually."
 ---
 
 # Update Zed
 
-Zed is designed to keep itself up to date automatically. You can always update this behavior in your settings.
+Zed does not update itself. It does not check for, download, or install new versions, and there is no setting that turns this on.
 
-## Auto-updates
+## How to update
 
-By default, Zed checks for updates and installs them automatically the next time you restart the app. You’ll always be running the latest version with no extra steps.
+To update, install a newer version manually, the same way you installed the current one. If you built Zed from source, fetch the latest changes and rebuild.
 
-If an update is available, Zed will download it in the background and apply it on restart.
+Selecting **Check for Updates** from the application menu (or running {#action zed::CheckForUpdates} from the Command Palette) shows a reminder that updates are installed manually. It does not contact any server.
 
 ## How to check your current version
 
@@ -20,7 +20,3 @@ To check which version of Zed you're using:
 Open the Command Palette (Cmd+Shift+P on macOS, Ctrl+Shift+P on Linux/Windows).
 
 Type and select {#action zed::About}. A modal will appear with your version information.
-
-## How to control update behavior
-
-If you want to turn off auto-updates, open the Settings Editor (Cmd ,) and find `Auto Update` under General Settings.

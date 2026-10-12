@@ -2027,7 +2027,6 @@ impl WorkspaceDb {
                     container_id: container_id?,
                     name: name?,
                     remote_user: user?,
-                    upload_binary_over_docker_exec: false,
                     use_podman: use_podman?,
                     remote_env,
                 }))

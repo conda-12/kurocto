@@ -114,7 +114,6 @@ mod tests {
             args: Some(vec!["-v".to_string()]),
             connection_timeout: Some(30),
             nickname: Some("work".to_string()),
-            upload_binary_over_ssh: true,
             ..Default::default()
         });
         let right = RemoteConnectionOptions::Ssh(SshConnectionOptions {
@@ -125,7 +124,6 @@ mod tests {
             args: None,
             connection_timeout: None,
             nickname: None,
-            upload_binary_over_ssh: false,
             ..Default::default()
         });
 
@@ -170,7 +168,6 @@ mod tests {
             name: "zed-dev".to_string(),
             container_id: "container-123".to_string(),
             remote_user: "anth".to_string(),
-            upload_binary_over_docker_exec: true,
             use_podman: true,
             remote_env: BTreeMap::from([("FOO".to_string(), "BAR".to_string())]),
         });
@@ -178,7 +175,6 @@ mod tests {
             name: "zed-dev".to_string(),
             container_id: "container-123".to_string(),
             remote_user: "anth".to_string(),
-            upload_binary_over_docker_exec: false,
             use_podman: false,
             remote_env: BTreeMap::new(),
         });
