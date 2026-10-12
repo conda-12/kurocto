@@ -48,14 +48,12 @@ struct TelemetryState {
     system_id: Option<Arc<str>>,       // Per system
     installation_id: Option<Arc<str>>, // Per app installation (different for dev, nightly, preview, and stable)
     session_id: Option<String>,        // Per app launch
-    metrics_id: Option<Arc<str>>,      // Per logged-in user
     release_channel: Option<ReleaseChannel>,
     architecture: &'static str,
     events_queue: Vec<EventWrapper>,
     flush_events_task: Option<Task<()>>,
 
     log_file: Option<File>,
-    is_staff: Option<bool>,
     first_event_date_time: Option<Instant>,
     event_coalescer: EventCoalescer,
     max_queue_size: usize,
@@ -195,11 +193,9 @@ impl Telemetry {
             system_id: None,
             installation_id: None,
             session_id: None,
-            metrics_id: None,
             events_queue: Vec::new(),
             flush_events_task: None,
             log_file: None,
-            is_staff: None,
             first_event_date_time: None,
             event_coalescer: EventCoalescer::new(clock.clone()),
             max_queue_size: MAX_QUEUE_LEN,
@@ -374,23 +370,6 @@ impl Telemetry {
 
     pub fn diagnostics_enabled(self: &Arc<Self>) -> bool {
         self.state.lock().settings.diagnostics
-    }
-
-    pub fn set_authenticated_user_info(
-        self: &Arc<Self>,
-        metrics_id: Option<String>,
-        is_staff: bool,
-    ) {
-        let mut state = self.state.lock();
-
-        if !state.settings.metrics {
-            return;
-        }
-
-        let metrics_id: Option<Arc<str>> = metrics_id.map(|id| id.into());
-        state.metrics_id.clone_from(&metrics_id);
-        state.is_staff = Some(is_staff);
-        drop(state);
     }
 
     pub fn report_assistant_event(self: &Arc<Self>, event: AssistantEventData) {
@@ -599,9 +578,8 @@ impl Telemetry {
             }
         };
 
-        let signed_in = state.metrics_id.is_some();
         let event_wrapper = EventWrapper {
-            signed_in,
+            signed_in: false,
             milliseconds_since_first_event,
             event,
         };
@@ -618,20 +596,12 @@ impl Telemetry {
         }
     }
 
-    pub fn metrics_id(self: &Arc<Self>) -> Option<Arc<str>> {
-        self.state.lock().metrics_id.clone()
-    }
-
     pub fn system_id(self: &Arc<Self>) -> Option<Arc<str>> {
         self.state.lock().system_id.clone()
     }
 
     pub fn installation_id(self: &Arc<Self>) -> Option<Arc<str>> {
         self.state.lock().installation_id.clone()
-    }
-
-    pub fn is_staff(self: &Arc<Self>) -> Option<bool> {
-        self.state.lock().is_staff
     }
 
     fn build_request(
@@ -684,8 +654,6 @@ impl Telemetry {
                     system_id: state.system_id.as_deref().map(Into::into),
                     installation_id: state.installation_id.as_deref().map(Into::into),
                     session_id: state.session_id.clone(),
-                    metrics_id: state.metrics_id.as_deref().map(Into::into),
-                    is_staff: state.is_staff,
                     app_version: state.app_version.clone(),
                     os_name: state.os_name.clone(),
                     os_version: state.os_version.clone(),

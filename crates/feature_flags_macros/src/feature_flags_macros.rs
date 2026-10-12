@@ -6,7 +6,7 @@ use syn::{Data, DeriveInput, Fields, Ident, LitStr, parse_macro_input};
 /// Derives [`feature_flags::FeatureFlagValue`] for a unit-only enum.
 ///
 /// Exactly one variant must be marked with `#[default]`. The default variant
-/// is the one returned when the feature flag is announced by the server,
+/// is the one returned when the feature flag is explicitly enabled,
 /// enabled for all users, or enabled by the staff rule — it's the "on"
 /// value, and also the fallback for `from_wire`.
 ///
@@ -17,8 +17,8 @@ use syn::{Data, DeriveInput, Fields, Ident, LitStr, parse_macro_input};
 ///   PascalCase word boundaries (e.g. `NewWorktree` → `"new-worktree"`).
 /// * `label` — the variant name with PascalCase boundaries expanded to
 ///   spaces (e.g. `NewWorktree` → `"New Worktree"`).
-/// * `from_wire` — always returns the default variant, since today the
-///   server wire format is just presence and does not carry a variant.
+/// * `from_wire` — always returns the default variant, since an explicitly
+///   enabled flag is just presence and does not carry a variant.
 ///
 /// ## Example
 ///

@@ -917,24 +917,8 @@ fn register_actions(
              window: &mut Window,
              cx: &mut Context<Workspace>| {
                 let project = workspace.project().clone();
-                // In a collab session the report buffer is visible to other
-                // participants, so attribute the data to this user's machine.
-                let reported_by = if project.read(cx).is_shared()
-                    || project.read(cx).is_via_collab()
-                {
-                    workspace
-                        .user_store()
-                        .read(cx)
-                        .current_user()
-                        .map(|user| user.username.to_string())
-                } else {
-                    None
-                };
-                let report_data = input_latency_ui::snapshot_input_latency_report(
-                    window,
-                    reported_by,
-                    cx,
-                );
+                let report_data =
+                    input_latency_ui::snapshot_input_latency_report(window, cx);
                 cx.spawn_in(window, async move |workspace, cx| {
                     let report = cx
                         .background_spawn(async move {
@@ -5488,7 +5472,6 @@ mod tests {
             let app_state = AppState::test(cx);
 
             theme_settings::init(theme::LoadThemes::JustBase, cx);
-            client::init(&app_state.client, cx);
             workspace::init(app_state.clone(), cx);
             onboarding::init(cx);
             app_state
@@ -5891,7 +5874,6 @@ mod tests {
                 "buffer_search",
                 "call_hierarchy",
                 "cli",
-                "client",
                 "collab",
                 "command_palette",
                 "console",
@@ -6165,11 +6147,6 @@ mod tests {
             );
             image_viewer::init(cx);
             language_model::init(cx);
-            client::RefreshLlmTokenListener::register(
-                app_state.client.clone(),
-                app_state.user_store.clone(),
-                cx,
-            );
             language_models::init(app_state.client.clone(), cx);
             web_search::init(cx);
             let prompt_builder = PromptBuilder::load(app_state.fs.clone(), false, cx);

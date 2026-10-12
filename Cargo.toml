@@ -27,9 +27,7 @@ members = [
     "crates/cli",
     "crates/client",
     "crates/clock",
-    "crates/cloud_api_client",
     "crates/cloud_api_types",
-    "crates/cloud_llm_client",
     "crates/codestral",
     "crates/collections",
     "crates/command_palette",
@@ -295,9 +293,7 @@ call_hierarchy = { path = "crates/call_hierarchy" }
 cli = { path = "crates/cli", default-features = false }
 client = { path = "crates/client" }
 clock = { path = "crates/clock" }
-cloud_api_client = { path = "crates/cloud_api_client" }
 cloud_api_types = { path = "crates/cloud_api_types" }
-cloud_llm_client = { path = "crates/cloud_llm_client" }
 codestral = { path = "crates/codestral" }
 collections = { path = "crates/collections", version = "0.1.0" }
 command_palette = { path = "crates/command_palette" }
@@ -570,7 +566,6 @@ cargo_toml = "0.21"
 cbindgen = { version = "0.28.0", default-features = false }
 chardetng = "0.1"
 chrono = { version = "0.4", default-features = false, features = ["std", "serde"] }
-ciborium = "0.2"
 clap = { version = "4.4", features = ["derive", "wrap_help"] }
 clap_complete = "4.4"
 clap_complete_nushell = "4.4"
@@ -808,7 +803,6 @@ resvg = { version = "0.46.0", default-features = false, features = [
     "memmap-fonts",
     "raster-images",
 ] }
-rsa = { version = "0.9", default-features = false, features = ["std", "u64_digit"] }
 runtimelib = { version = "1.4.0", default-features = false, features = [
     "async-dispatcher-runtime", "aws-lc-rs"
 ] }
@@ -866,7 +860,6 @@ time = { version = "0.3", features = [
 ] }
 tiny_http = "0.12"
 tokio = "1"
-tokio-rustls = { version = "0.26", default-features = false }
 toml = { version = "0.9", default-features = false, features = ["std", "serde", "parse"] }
 toml_edit = { version = "0.22", default-features = false, features = ["parse"] }
 tower-http = "0.4.4"
@@ -938,7 +931,6 @@ windows-core = "0.62"
 windows-registry = "0.6.0"
 xkbcommon = { version = "0.8", default-features = false }
 yaml-rust2 = { version = "0.8", default-features = false }
-yawc = { version = "0.4", default-features = false }
 zeroize = "1.8"
 zstd = { version = "0.13", default-features = false, features = ["legacy", "arrays"] }
 

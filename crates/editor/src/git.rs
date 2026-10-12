@@ -196,8 +196,6 @@ pub(super) struct DiffReviewOverlay {
     /// Subscriptions for inline edit editors' action handlers.
     /// Key: comment ID, Value: Subscription keeping the Newline action handler alive.
     pub(super) inline_edit_subscriptions: HashMap<usize, Subscription>,
-    /// The current user's avatar URI for display in comment rows.
-    pub(super) user_avatar_uri: Option<SharedUri>,
     /// Subscription to keep the action handler alive.
     _subscription: Subscription,
 }
@@ -606,15 +604,6 @@ impl Editor {
         // Dismiss overlays that have no comments for their hunks
         self.dismiss_overlays_without_comments(cx);
 
-        // Get the current user's avatar URI from the project's user_store
-        let user_avatar_uri = self.project.as_ref().and_then(|project| {
-            let user_store = project.read(cx).user_store();
-            user_store
-                .read(cx)
-                .current_user()
-                .map(|user| user.avatar_uri.clone())
-        });
-
         // Create anchor at the end of the last row so the block appears immediately below it
         // Use multibuffer coordinates for anchor creation
         let line_len = buffer_snapshot.line_len(end_multi_buffer_row);
@@ -681,7 +670,6 @@ impl Editor {
             comments_expanded: true,
             inline_edit_editors: HashMap::default(),
             inline_edit_subscriptions: HashMap::default(),
-            user_avatar_uri,
             _subscription: subscription,
         });
 
@@ -2070,7 +2058,7 @@ impl Editor {
         snapshot: &MultiBufferSnapshot,
     ) -> u32 {
         let comment_count = self.hunk_comment_count(hunk_key, snapshot);
-        let base_height: u32 = 2; // Input row with avatar and buttons
+        let base_height: u32 = 2; // Input row with user icon and buttons
 
         if comment_count == 0 {
             base_height
@@ -2528,48 +2516,43 @@ impl Editor {
         let theme = cx.theme();
         let colors = theme.colors();
 
-        let (comments, comments_expanded, inline_editors, user_avatar_uri, line_ranges) =
-            editor_handle
-                .upgrade()
-                .map(|editor| {
-                    let editor = editor.read(cx);
-                    let snapshot = editor.buffer().read(cx).snapshot(cx);
-                    let comments = editor.comments_for_hunk(hunk_key, &snapshot).to_vec();
-                    let (expanded, editors, avatar_uri, line_ranges) = editor
-                        .diff_review_overlays
-                        .iter()
-                        .find(|overlay| {
-                            Editor::hunk_keys_match(&overlay.hunk_key, hunk_key, &snapshot)
-                        })
-                        .map(|o| {
-                            let start_point = o.anchor_range.start.to_point(&snapshot);
-                            let end_point = o.anchor_range.end.to_point(&snapshot);
-                            // Get line ranges per excerpt to detect discontinuities
-                            let buffer_ranges =
-                                snapshot.range_to_buffer_ranges(start_point..end_point);
-                            let ranges: Vec<(u32, u32)> = buffer_ranges
-                                .iter()
-                                .map(|(buffer_snapshot, range, _)| {
-                                    let start = buffer_snapshot.offset_to_point(range.start.0).row;
-                                    let end = buffer_snapshot.offset_to_point(range.end.0).row;
-                                    (start, end)
-                                })
-                                .collect();
-                            (
-                                o.comments_expanded,
-                                o.inline_edit_editors.clone(),
-                                o.user_avatar_uri.clone(),
-                                if ranges.is_empty() {
-                                    None
-                                } else {
-                                    Some(ranges)
-                                },
-                            )
-                        })
-                        .unwrap_or((true, HashMap::default(), None, None));
-                    (comments, expanded, editors, avatar_uri, line_ranges)
-                })
-                .unwrap_or((Vec::new(), true, HashMap::default(), None, None));
+        let (comments, comments_expanded, inline_editors, line_ranges) = editor_handle
+            .upgrade()
+            .map(|editor| {
+                let editor = editor.read(cx);
+                let snapshot = editor.buffer().read(cx).snapshot(cx);
+                let comments = editor.comments_for_hunk(hunk_key, &snapshot).to_vec();
+                let (expanded, editors, line_ranges) = editor
+                    .diff_review_overlays
+                    .iter()
+                    .find(|overlay| Editor::hunk_keys_match(&overlay.hunk_key, hunk_key, &snapshot))
+                    .map(|o| {
+                        let start_point = o.anchor_range.start.to_point(&snapshot);
+                        let end_point = o.anchor_range.end.to_point(&snapshot);
+                        // Get line ranges per excerpt to detect discontinuities
+                        let buffer_ranges = snapshot.range_to_buffer_ranges(start_point..end_point);
+                        let ranges: Vec<(u32, u32)> = buffer_ranges
+                            .iter()
+                            .map(|(buffer_snapshot, range, _)| {
+                                let start = buffer_snapshot.offset_to_point(range.start.0).row;
+                                let end = buffer_snapshot.offset_to_point(range.end.0).row;
+                                (start, end)
+                            })
+                            .collect();
+                        (
+                            o.comments_expanded,
+                            o.inline_edit_editors.clone(),
+                            if ranges.is_empty() {
+                                None
+                            } else {
+                                Some(ranges)
+                            },
+                        )
+                    })
+                    .unwrap_or((true, HashMap::default(), None));
+                (comments, expanded, editors, line_ranges)
+            })
+            .unwrap_or((Vec::new(), true, HashMap::default(), None));
 
         let comment_count = comments.len();
         let avatar_size = px(20.);
@@ -2597,7 +2580,7 @@ impl Editor {
                     el
                 }
             })
-            // Top row: editable input with user's avatar
+            // Top row: editable input with a user icon
             .child(
                 h_flex()
                     .w_full()
@@ -2613,16 +2596,11 @@ impl Editor {
                             .flex_shrink_0()
                             .rounded_full()
                             .overflow_hidden()
-                            .child(if let Some(ref avatar_uri) = user_avatar_uri {
-                                Avatar::new(avatar_uri.clone())
-                                    .size(avatar_size)
-                                    .into_any_element()
-                            } else {
+                            .child(
                                 Icon::new(IconName::Person)
                                     .size(IconSize::Small)
-                                    .color(ui::Color::Muted)
-                                    .into_any_element()
-                            }),
+                                    .color(ui::Color::Muted),
+                            ),
                     )
                     .child(
                         div()
@@ -2669,7 +2647,6 @@ impl Editor {
                     comments,
                     comments_expanded,
                     inline_editors,
-                    user_avatar_uri,
                     avatar_size,
                     action_icon_size,
                     colors,
@@ -2682,7 +2659,6 @@ impl Editor {
         comments: Vec<StoredReviewComment>,
         expanded: bool,
         inline_editors: HashMap<usize, Entity<Editor>>,
-        user_avatar_uri: Option<SharedUri>,
         avatar_size: Pixels,
         action_icon_size: IconSize,
         colors: &theme::ThemeColors,
@@ -2736,7 +2712,6 @@ impl Editor {
                     Self::render_comment_row(
                         comment,
                         inline_editor,
-                        user_avatar_uri.clone(),
                         avatar_size,
                         action_icon_size,
                         colors,
@@ -2748,7 +2723,6 @@ impl Editor {
     fn render_comment_row(
         comment: StoredReviewComment,
         inline_editor: Option<Entity<Editor>>,
-        user_avatar_uri: Option<SharedUri>,
         avatar_size: Pixels,
         action_icon_size: IconSize,
         colors: &theme::ThemeColors,
@@ -2770,16 +2744,11 @@ impl Editor {
                     .flex_shrink_0()
                     .rounded_full()
                     .overflow_hidden()
-                    .child(if let Some(ref avatar_uri) = user_avatar_uri {
-                        Avatar::new(avatar_uri.clone())
-                            .size(avatar_size)
-                            .into_any_element()
-                    } else {
+                    .child(
                         Icon::new(IconName::Person)
                             .size(IconSize::Small)
-                            .color(ui::Color::Muted)
-                            .into_any_element()
-                    }),
+                            .color(ui::Color::Muted),
+                    ),
             )
             .child(if let Some(editor) = inline_editor {
                 // Inline edit mode: show an editable text field

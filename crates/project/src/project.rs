@@ -3,7 +3,6 @@ pub mod agent_server_store;
 pub mod bookmark_store;
 pub mod buffer_store;
 pub mod color_extractor;
-pub mod connection_manager;
 pub mod context_server_store;
 pub mod debounced_delay;
 pub mod debugger;
@@ -1194,8 +1193,6 @@ impl DisableAiSettings {
 
 impl Project {
     pub fn init(client: &Arc<Client>, cx: &mut App) {
-        connection_manager::init(client.clone(), cx);
-
         let client: AnyProtoClient = client.clone().into();
         client.add_entity_message_handler(Self::handle_add_collaborator);
         client.add_entity_message_handler(Self::handle_update_project_collaborator);
@@ -1727,8 +1724,6 @@ impl Project {
         fs: Arc<dyn Fs>,
         cx: AsyncApp,
     ) -> Result<Entity<Self>> {
-        client.connect(true, &cx).await.into_response()?;
-
         let subscriptions = [
             EntitySubscription::Project(client.subscribe_to_entity::<Self>(remote_id)?),
             EntitySubscription::BufferStore(client.subscribe_to_entity::<BufferStore>(remote_id)?),
@@ -1987,26 +1982,20 @@ impl Project {
             .into_iter()
             .map(|s| match s {
                 EntitySubscription::BufferStore(subscription) => {
-                    subscription.set_entity(&buffer_store, &cx)
+                    subscription.set_entity(&buffer_store)
                 }
                 EntitySubscription::WorktreeStore(subscription) => {
-                    subscription.set_entity(&worktree_store, &cx)
+                    subscription.set_entity(&worktree_store)
                 }
-                EntitySubscription::GitStore(subscription) => {
-                    subscription.set_entity(&git_store, &cx)
-                }
+                EntitySubscription::GitStore(subscription) => subscription.set_entity(&git_store),
                 EntitySubscription::SettingsObserver(subscription) => {
-                    subscription.set_entity(&settings_observer, &cx)
+                    subscription.set_entity(&settings_observer)
                 }
-                EntitySubscription::Project(subscription) => subscription.set_entity(&project, &cx),
-                EntitySubscription::LspStore(subscription) => {
-                    subscription.set_entity(&lsp_store, &cx)
-                }
-                EntitySubscription::DapStore(subscription) => {
-                    subscription.set_entity(&dap_store, &cx)
-                }
+                EntitySubscription::Project(subscription) => subscription.set_entity(&project),
+                EntitySubscription::LspStore(subscription) => subscription.set_entity(&lsp_store),
+                EntitySubscription::DapStore(subscription) => subscription.set_entity(&dap_store),
                 EntitySubscription::BreakpointStore(subscription) => {
-                    subscription.set_entity(&breakpoint_store, &cx)
+                    subscription.set_entity(&breakpoint_store)
                 }
             })
             .collect::<Vec<_>>();
@@ -2830,28 +2819,28 @@ impl Project {
         self.client_subscriptions.extend([
             self.collab_client
                 .subscribe_to_entity(project_id)?
-                .set_entity(&cx.entity(), &cx.to_async()),
+                .set_entity(&cx.entity()),
             self.collab_client
                 .subscribe_to_entity(project_id)?
-                .set_entity(&self.worktree_store, &cx.to_async()),
+                .set_entity(&self.worktree_store),
             self.collab_client
                 .subscribe_to_entity(project_id)?
-                .set_entity(&self.buffer_store, &cx.to_async()),
+                .set_entity(&self.buffer_store),
             self.collab_client
                 .subscribe_to_entity(project_id)?
-                .set_entity(&self.lsp_store, &cx.to_async()),
+                .set_entity(&self.lsp_store),
             self.collab_client
                 .subscribe_to_entity(project_id)?
-                .set_entity(&self.settings_observer, &cx.to_async()),
+                .set_entity(&self.settings_observer),
             self.collab_client
                 .subscribe_to_entity(project_id)?
-                .set_entity(&self.dap_store, &cx.to_async()),
+                .set_entity(&self.dap_store),
             self.collab_client
                 .subscribe_to_entity(project_id)?
-                .set_entity(&self.breakpoint_store, &cx.to_async()),
+                .set_entity(&self.breakpoint_store),
             self.collab_client
                 .subscribe_to_entity(project_id)?
-                .set_entity(&self.git_store, &cx.to_async()),
+                .set_entity(&self.git_store),
         ]);
 
         self.buffer_store.update(cx, |buffer_store, cx| {

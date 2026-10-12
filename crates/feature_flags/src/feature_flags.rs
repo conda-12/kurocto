@@ -40,7 +40,7 @@ pub trait FeatureFlagValue:
     }
 
     /// The variant that represents "on" — what the store resolves to when
-    /// staff rules, `enabled_for_all`, or a server announcement apply.
+    /// staff rules, `enabled_for_all`, or an explicitly enabled flag apply.
     ///
     /// For enum flags this is usually the same as [`Default::default`] (the
     /// variant marked `#[default]` in the derive). [`PresenceFlag`] overrides
@@ -55,7 +55,7 @@ pub trait FeatureFlagValue:
 ///
 /// The fallback value is [`PresenceFlag::Off`] so that an absent / unknown
 /// flag reads as disabled; the `on_variant` override pins the "enabled"
-/// state to [`PresenceFlag::On`] so staff / server / `enabled_for_all`
+/// state to [`PresenceFlag::On`] so staff / explicit / `enabled_for_all`
 /// resolution still lights the flag up.
 #[derive(Clone, Copy, Default, PartialEq, Eq, Debug)]
 pub enum PresenceFlag {
@@ -125,8 +125,7 @@ pub trait FeatureFlag {
 
     /// Returns whether this feature flag is enabled for everyone.
     ///
-    /// This is generally done on the server, but we provide this as a way to entirely enable a feature flag client-side
-    /// without needing to remove all of the call sites.
+    /// This is a way to entirely enable a feature flag without needing to remove all of the call sites.
     fn enabled_for_all() -> bool {
         false
     }
@@ -203,25 +202,15 @@ where
     }
 }
 
-#[derive(Debug)]
-pub struct OnFlagsReady {
-    pub is_staff: bool,
-}
-
 pub trait FeatureFlagAppExt {
     fn update_flags(&mut self, staff: bool, flags: Vec<String>);
     fn set_staff(&mut self, staff: bool);
     fn has_flag<T: FeatureFlag>(&self) -> bool;
     fn flag_value<T: FeatureFlag>(&self) -> T::Value;
-    fn is_staff(&self) -> bool;
 
     /// Whether feature flag overrides from settings are honored for the
     /// current user. Overrides are a staff-only affordance.
     fn feature_flag_overrides_enabled(&self) -> bool;
-
-    fn on_flags_ready<F>(&mut self, callback: F) -> Subscription
-    where
-        F: FnMut(OnFlagsReady, &mut App) + 'static;
 
     fn observe_flag<T: FeatureFlag, F>(&mut self, callback: F) -> Subscription
     where
@@ -231,7 +220,7 @@ pub trait FeatureFlagAppExt {
 impl FeatureFlagAppExt for App {
     fn update_flags(&mut self, staff: bool, flags: Vec<String>) {
         let store = self.default_global::<FeatureFlagStore>();
-        store.update_server_flags(staff, flags);
+        store.update_flags(staff, flags);
     }
 
     fn set_staff(&mut self, staff: bool) {
@@ -251,32 +240,9 @@ impl FeatureFlagAppExt for App {
             .unwrap_or_default()
     }
 
-    fn is_staff(&self) -> bool {
-        self.try_global::<FeatureFlagStore>()
-            .map(|store| store.is_staff())
-            .unwrap_or(false)
-    }
-
     fn feature_flag_overrides_enabled(&self) -> bool {
         self.try_global::<FeatureFlagStore>()
             .map_or(false, |store| store.overrides_enabled())
-    }
-
-    fn on_flags_ready<F>(&mut self, mut callback: F) -> Subscription
-    where
-        F: FnMut(OnFlagsReady, &mut App) + 'static,
-    {
-        self.observe_global::<FeatureFlagStore>(move |cx| {
-            let store = cx.global::<FeatureFlagStore>();
-            if store.server_flags_received() {
-                callback(
-                    OnFlagsReady {
-                        is_staff: store.is_staff(),
-                    },
-                    cx,
-                );
-            }
-        })
     }
 
     fn observe_flag<T: FeatureFlag, F>(&mut self, mut callback: F) -> Subscription

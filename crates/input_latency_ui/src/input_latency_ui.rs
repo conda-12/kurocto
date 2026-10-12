@@ -26,20 +26,12 @@ pub struct InputLatencyReportData {
     previous_snapshot: Option<InputLatencySnapshot>,
     previous_timestamp: Option<chrono::DateTime<chrono::Local>>,
     timestamp: chrono::DateTime<chrono::Local>,
-    /// The collab username of the user whose machine produced the data.
-    /// Set when the report will be placed in a buffer visible to other
-    /// collaborators, so it's clear whose latency was measured.
-    reported_by: Option<String>,
 }
 
 /// Captures the input-to-frame latency histogram for the given window, along
 /// with the previous report's baseline (tracked via a global on the `App`) for
 /// delta computation. Advances the baseline to this snapshot.
-pub fn snapshot_input_latency_report(
-    window: &Window,
-    reported_by: Option<String>,
-    cx: &mut App,
-) -> InputLatencyReportData {
+pub fn snapshot_input_latency_report(window: &Window, cx: &mut App) -> InputLatencyReportData {
     let snapshot = window.input_latency_snapshot();
     let timestamp = chrono::Local::now();
     let state = cx.default_global::<ReporterState>();
@@ -49,7 +41,6 @@ pub fn snapshot_input_latency_report(
         previous_snapshot: state.previous_snapshot.take(),
         previous_timestamp: state.previous_timestamp.take(),
         timestamp,
-        reported_by,
     };
 
     state.previous_snapshot = Some(snapshot);
@@ -390,9 +381,6 @@ fn format_report(data: &InputLatencyReportData) -> String {
 
     let timestamp = now.format("%Y-%m-%d %H:%M:%S %Z");
     report.push_str(&format!("Timestamp: {timestamp}\n"));
-    if let Some(reported_by) = &data.reported_by {
-        report.push_str(&format!("Reported from {reported_by}'s machine\n"));
-    }
     report.push_str(&format!("Samples: {total}\n"));
     if snapshot.mid_draw_events_dropped > 0 {
         report.push_str(&format!(

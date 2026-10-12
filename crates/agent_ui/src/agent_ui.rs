@@ -46,7 +46,6 @@ use agent_settings::{AgentProfileId, AgentSettings};
 use anyhow::Context as _;
 use command_palette_hooks::CommandPaletteFilter;
 use editor::{Editor, scroll::Autoscroll};
-use feature_flags::FeatureFlagAppExt as _;
 use fs::Fs;
 use gpui::{
     Action, App, Context, Entity, ImageSource, ReadGlobal as _, Resource, SharedString, SharedUri,
@@ -782,27 +781,11 @@ pub fn init(
     })
     .detach();
 
-    cx.on_flags_ready(|_, cx| {
-        update_command_palette_filter(cx);
-    })
-    .detach();
-
     // Kick off the one-time migration of non-Default Rules to global
-    // Skills. Test builds keep the old feature-flag deferral because
-    // server flags are never received in `gpui::test` contexts, avoiding
-    // sqlite worker activity that can race with the deterministic scheduler.
-    #[cfg(any(test, feature = "test-support"))]
-    {
-        let fs = fs.clone();
-        cx.on_flags_ready(move |_, cx| {
-            rules_to_skills_migration::migrate_rules_to_skills_if_needed(fs.clone(), cx);
-        })
-        .detach();
-    }
+    // Skills. Test builds skip it to avoid sqlite worker activity that can
+    // race with the deterministic scheduler.
     #[cfg(not(any(test, feature = "test-support")))]
-    {
-        rules_to_skills_migration::migrate_rules_to_skills_if_needed(fs.clone(), cx);
-    }
+    rules_to_skills_migration::migrate_rules_to_skills_if_needed(fs.clone(), cx);
 
     maybe_backfill_editor_layout(fs, is_new_install, cx);
 }
@@ -1036,6 +1019,7 @@ mod tests {
     use command_palette_hooks::CommandPaletteFilter;
     use db::kvp::KeyValueStore;
     use editor::actions::AcceptEditPrediction;
+    use feature_flags::FeatureFlagAppExt as _;
     use gpui::{BorrowAppContext, TestAppContext, px};
     use project::DisableAiSettings;
     use settings::{

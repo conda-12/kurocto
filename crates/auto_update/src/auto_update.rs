@@ -114,9 +114,7 @@ pub struct AssetQuery<'a> {
     asset: &'a str,
     os: &'a str,
     arch: &'a str,
-    metrics_id: Option<&'a str>,
     system_id: Option<&'a str>,
-    is_staff: Option<bool>,
 }
 
 #[derive(Clone, Debug)]
@@ -685,14 +683,10 @@ impl AutoUpdater {
     ) -> Result<ReleaseAsset> {
         let client = this.read_with(cx, |this, _| this.client.clone());
 
-        let (system_id, metrics_id, is_staff) = if client.telemetry().metrics_enabled() {
-            (
-                client.telemetry().system_id(),
-                client.telemetry().metrics_id(),
-                client.telemetry().is_staff(),
-            )
+        let system_id = if client.telemetry().metrics_enabled() {
+            client.telemetry().system_id()
         } else {
-            (None, None, None)
+            None
         };
 
         let version = if let Some(mut version) = version {
@@ -711,9 +705,7 @@ impl AutoUpdater {
                 os,
                 arch,
                 asset,
-                metrics_id: metrics_id.as_deref(),
                 system_id: system_id.as_deref(),
-                is_staff,
             },
         )?;
 

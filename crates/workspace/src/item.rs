@@ -8,7 +8,7 @@ use crate::{
     workspace_settings::{AutosaveSetting, WorkspaceSettings},
 };
 use anyhow::Result;
-use client::{Client, proto};
+use client::proto;
 use futures::channel::mpsc;
 use gpui::{
     Action, AnyElement, AnyEntity, AnyView, App, AppContext, Context, Entity, EntityId,
@@ -804,7 +804,7 @@ impl<T: Item> ItemHandle for Entity<T> {
                                     proto::update_followers::Variant::UpdateView(
                                         proto::UpdateView {
                                             id: item
-                                                .remote_id(workspace.client(), window, cx)
+                                                .remote_id(window, cx)
                                                 .and_then(|id| id.to_proto()),
                                             variant: pending_update.borrow_mut().take(),
                                             leader_id,
@@ -1304,7 +1304,7 @@ pub trait FollowableItem: Item {
 }
 
 pub trait FollowableItemHandle: ItemHandle {
-    fn remote_id(&self, client: &Arc<Client>, window: &mut Window, cx: &mut App) -> Option<ViewId>;
+    fn remote_id(&self, window: &mut Window, cx: &mut App) -> Option<ViewId>;
     fn downgrade(&self) -> Box<dyn WeakFollowableItemHandle>;
     fn set_leader_id(
         &self,
@@ -1339,13 +1339,8 @@ pub trait FollowableItemHandle: ItemHandle {
 }
 
 impl<T: FollowableItem> FollowableItemHandle for Entity<T> {
-    fn remote_id(&self, client: &Arc<Client>, _: &mut Window, cx: &mut App) -> Option<ViewId> {
-        self.read(cx).remote_id().or_else(|| {
-            client.peer_id().map(|creator| ViewId {
-                creator: CollaboratorId::PeerId(creator),
-                id: self.item_id().as_u64(),
-            })
-        })
+    fn remote_id(&self, _: &mut Window, cx: &mut App) -> Option<ViewId> {
+        self.read(cx).remote_id()
     }
 
     fn downgrade(&self) -> Box<dyn WeakFollowableItemHandle> {

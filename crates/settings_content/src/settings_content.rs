@@ -287,13 +287,6 @@ pub struct SettingsContent {
     /// The URL of the Zed server to connect to.
     pub server_url: Option<String>,
 
-    /// The URL used as the key for credential storage.
-    ///
-    /// When set, credentials are stored under this URL instead of `server_url`.
-    /// This allows running multiple Zed instances side by side without them
-    /// overwriting each other's keychain entries.
-    pub credentials_url: Option<String>,
-
     /// Configuration for session-related features
     pub session: Option<SessionSettingsContent>,
     /// Control what info is collected by Zed.
@@ -403,7 +396,7 @@ fallible_options::flattened_deserialize!(SettingsContent {
         git,
         global_lsp_settings, image_viewer, markdown_preview, repl, helix_mode, hide_mouse,
         journal, log, line_indicator_format, language_models, copilot, outline_panel, project_panel,
-        node, proxy, reduce_motion, server_url, credentials_url, session, telemetry, terminal,
+        node, proxy, reduce_motion, server_url, session, telemetry, terminal,
         title_bar, vim_mode, which_key, vim, modeline_lines, feature_flags,
         instrumentation,
     },

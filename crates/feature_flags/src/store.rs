@@ -69,8 +69,7 @@ macro_rules! register_feature_flag {
 #[derive(Default)]
 pub struct FeatureFlagStore {
     staff: bool,
-    server_flags: HashMap<String, String>,
-    server_flags_received: bool,
+    enabled_flags: HashMap<String, String>,
 
     _settings_subscription: Option<Subscription>,
 }
@@ -92,10 +91,6 @@ impl FeatureFlagStore {
         inventory::iter::<FeatureFlagDescriptor>().filter(move |d| seen.insert((d.type_id)()))
     }
 
-    pub fn is_staff(&self) -> bool {
-        self.staff
-    }
-
     /// Whether feature flag overrides from settings should be honored.
     ///
     /// Overrides are a staff-only affordance, so non-staff users in release
@@ -106,20 +101,15 @@ impl FeatureFlagStore {
         (cfg!(debug_assertions) || self.staff) && !*ZED_DISABLE_STAFF
     }
 
-    pub fn server_flags_received(&self) -> bool {
-        self.server_flags_received
-    }
-
     pub fn set_staff(&mut self, staff: bool) {
         self.staff = staff;
     }
 
-    pub fn update_server_flags(&mut self, staff: bool, flags: Vec<String>) {
+    pub fn update_flags(&mut self, staff: bool, flags: Vec<String>) {
         self.staff = staff;
-        self.server_flags_received = true;
-        self.server_flags.clear();
+        self.enabled_flags.clear();
         for flag in flags {
-            self.server_flags.insert(flag.clone(), flag);
+            self.enabled_flags.insert(flag.clone(), flag);
         }
     }
 
@@ -159,8 +149,8 @@ impl FeatureFlagStore {
     }
 
     /// The resolved value of the flag for the current user, taking overrides,
-    /// `enabled_for_all`, staff rules, and server flags into account in that
-    /// order of precedence. Overrides are read directly from
+    /// `enabled_for_all`, staff rules, and explicitly enabled flags into account
+    /// in that order of precedence. Overrides are read directly from
     /// [`FeatureFlagsSettings`].
     pub fn try_flag_value<T: FeatureFlag>(&self, cx: &App) -> Option<T::Value> {
         // `enabled_for_all` always wins, including over user overrides.
@@ -181,8 +171,7 @@ impl FeatureFlagStore {
             return Some(T::Value::on_variant());
         }
 
-        // Server-delivered flag.
-        if let Some(wire) = self.server_flags.get(T::NAME) {
+        if let Some(wire) = self.enabled_flags.get(T::NAME) {
             return T::Value::from_wire(wire);
         }
 
@@ -230,7 +219,7 @@ impl FeatureFlagStore {
             return on_variant_key;
         }
 
-        if self.server_flags.contains_key(descriptor.name) {
+        if self.enabled_flags.contains_key(descriptor.name) {
             return on_variant_key;
         }
 
@@ -312,19 +301,19 @@ mod tests {
     }
 
     #[gpui::test]
-    fn server_flag_enables_presence(cx: &mut App) {
+    fn explicitly_enabled_flag_enables_presence(cx: &mut App) {
         init_settings_store(cx);
         let mut store = FeatureFlagStore::default();
         assert!(!store.has_flag::<DemoFlag>(cx));
-        store.update_server_flags(false, vec!["demo".to_string()]);
+        store.update_flags(false, vec!["demo".to_string()]);
         assert!(store.has_flag::<DemoFlag>(cx));
     }
 
     #[gpui::test]
-    fn off_override_beats_server_flag(cx: &mut App) {
+    fn off_override_beats_explicitly_enabled_flag(cx: &mut App) {
         init_settings_store(cx);
         let mut store = FeatureFlagStore::default();
-        store.update_server_flags(false, vec!["demo".to_string()]);
+        store.update_flags(false, vec!["demo".to_string()]);
         set_override(DemoFlag::NAME, "off", cx);
         assert!(!store.has_flag::<DemoFlag>(cx));
         assert_eq!(
@@ -377,7 +366,7 @@ mod tests {
     }
 
     #[gpui::test]
-    fn on_override_enables_without_server_or_staff(cx: &mut App) {
+    fn on_override_enables_without_staff(cx: &mut App) {
         init_settings_store(cx);
         let store = FeatureFlagStore::default();
         set_override(DemoFlag::NAME, "on", cx);
@@ -396,30 +385,24 @@ mod tests {
     }
 
     #[gpui::test]
-    fn on_flags_ready_waits_for_server_flags(cx: &mut gpui::TestAppContext) {
-        use crate::FeatureFlagAppExt;
-        use std::cell::Cell;
-        use std::rc::Rc;
+    fn default_store_resolves_flags_locally(cx: &mut App) {
+        init_settings_store(cx);
+        let store = FeatureFlagStore::default();
 
-        cx.update(|cx| {
-            init_settings_store(cx);
-            FeatureFlagStore::init(cx);
-        });
+        struct StaffFlag;
+        impl FeatureFlag for StaffFlag {
+            const NAME: &'static str = "staff-demo";
+            type Value = PresenceFlag;
+        }
 
-        let fired = Rc::new(Cell::new(false));
-        cx.update({
-            let fired = fired.clone();
-            |cx| cx.on_flags_ready(move |_, _| fired.set(true)).detach()
-        });
-
-        // Settings-triggered no-op touch must not fire on_flags_ready.
-        cx.update(|cx| cx.update_default_global::<FeatureFlagStore, _>(|_, _| {}));
-        cx.run_until_parked();
-        assert!(!fired.get());
-
-        // Server flags arrive — now it should fire.
-        cx.update(|cx| cx.update_flags(true, vec![]));
-        cx.run_until_parked();
-        assert!(fired.get());
+        assert_eq!(
+            store.try_flag_value::<IntensityFlag>(cx),
+            Some(Intensity::Low)
+        );
+        assert!(!store.has_flag::<DemoFlag>(cx));
+        assert_eq!(
+            store.has_flag::<StaffFlag>(cx),
+            cfg!(debug_assertions) && !*ZED_DISABLE_STAFF
+        );
     }
 }

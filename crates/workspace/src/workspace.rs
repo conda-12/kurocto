@@ -93,7 +93,6 @@ pub use persistence::{
     read_serialized_multi_workspaces,
 };
 use persistence::{SerializedWindowBounds, model::SerializedWorkspace};
-use postage::stream::Stream;
 use project::{
     DirectoryLister, Project, ProjectEntryId, ProjectPath, ResolvedPath, Worktree, WorktreeId,
     WorktreeSettings,
@@ -1423,7 +1422,6 @@ impl AppState {
         let workspace_store = cx.new(|cx| WorkspaceStore::new(client.clone(), cx));
 
         theme_settings::init(theme::LoadThemes::JustBase, cx);
-        client::init(&client, cx);
 
         Arc::new(Self {
             client,
@@ -1613,7 +1611,6 @@ pub struct Workspace {
     dispatching_keystrokes: Rc<RefCell<DispatchingKeystrokes>>,
     _subscriptions: Vec<Subscription>,
     _apply_leader_updates: Task<Result<()>>,
-    _observe_current_user: Task<Result<()>>,
     _schedule_serialize_workspace: Option<Task<()>>,
     _serialize_workspace_task: Option<Task<()>>,
     _schedule_serialize_ssh_paths: Option<Task<()>>,
@@ -1909,20 +1906,6 @@ impl Workspace {
                 .insert((any_window_handle, weak_handle.clone()));
         });
 
-        let mut current_user = app_state.user_store.read(cx).watch_current_user();
-        let mut connection_status = app_state.client.status();
-        let _observe_current_user = cx.spawn_in(window, async move |this, cx| {
-            current_user.next().await;
-            connection_status.next().await;
-            let mut stream =
-                Stream::map(current_user, drop).merge(Stream::map(connection_status, drop));
-
-            while stream.recv().await.is_some() {
-                this.update(cx, |_, cx| cx.notify())?;
-            }
-            anyhow::Ok(())
-        });
-
         // All leader updates are enqueued and then processed in a single task, so
         // that each asynchronous operation can be run in order.
         let (leader_updates_tx, mut leader_updates_rx) =
@@ -2090,7 +2073,6 @@ impl Workspace {
             dirty_items: Default::default(),
             database_id: workspace_id,
             app_state,
-            _observe_current_user,
             _apply_leader_updates,
             _schedule_serialize_workspace: None,
             _serialize_workspace_task: None,
@@ -2889,10 +2871,6 @@ impl Workspace {
 
     pub fn take_panels_task(&mut self) -> Option<Task<Result<()>>> {
         self._panels_task.take()
-    }
-
-    pub fn user_store(&self) -> &Entity<UserStore> {
-        &self.app_state.user_store
     }
 
     pub fn project(&self) -> &Entity<Project> {
@@ -6677,7 +6655,7 @@ impl Workspace {
         };
 
         let item_handle = item.to_followable_item_handle(cx)?;
-        let id = item_handle.remote_id(&self.app_state.client, window, cx)?;
+        let id = item_handle.remote_id(window, cx)?;
         let variant = item_handle.to_state_proto(window, cx)?;
 
         if item_handle.is_project_item(window, cx)
@@ -6815,10 +6793,9 @@ impl Workspace {
             anyhow::Ok(state.pane().clone())
         })?;
         let existing_item = pane.update_in(cx, |pane, window, cx| {
-            let client = this.read(cx).client().clone();
             pane.items().find_map(|item| {
                 let item = item.to_followable_item_handle(cx)?;
-                if item.remote_id(&client, window, cx) == Some(id) {
+                if item.remote_id(window, cx) == Some(id) {
                     Some(item)
                 } else {
                     None
@@ -6960,9 +6937,7 @@ impl Workspace {
                 };
 
                 if let Some(item) = item.to_followable_item_handle(cx) {
-                    let id = item
-                        .remote_id(&self.app_state.client, window, cx)
-                        .map(|id| id.to_proto());
+                    let id = item.remote_id(window, cx).map(|id| id.to_proto());
 
                     if let Some(id) = id
                         && let Some(variant) = item.to_state_proto(window, cx)

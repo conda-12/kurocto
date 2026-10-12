@@ -73,7 +73,6 @@ struct TelemetryLogEntry {
     received_at: OffsetDateTime,
     event_type: SharedString,
     event_properties: HashMap<String, serde_json::Value>,
-    signed_in: bool,
     collapsed_md: Option<Entity<Markdown>>,
     expanded_md: Option<Entity<Markdown>>,
 }
@@ -167,7 +166,6 @@ impl TelemetryLogView {
             received_at: OffsetDateTime::now_utc(),
             event_type,
             event_properties,
-            signed_in: event_wrapper.signed_in,
             collapsed_md: None,
             expanded_md: None,
         };
@@ -320,7 +318,6 @@ impl TelemetryLogView {
         );
 
         let event_type = entry.event_type.clone();
-        let signed_in = entry.signed_in;
 
         let collapsed_md = entry.collapsed_md.clone();
 
@@ -347,7 +344,6 @@ impl TelemetryLogView {
 
         v_flex()
             .id(filtered_index)
-            .group("telemetry-entry")
             .cursor_pointer()
             .font_buffer(cx)
             .w_full()
@@ -395,15 +391,7 @@ impl TelemetryLogView {
                             .color(Color::Muted)
                             .size(LabelSize::Small),
                     )
-                    .child(Label::new(event_type).buffer_font(cx).color(Color::Default))
-                    .child(div().flex_1())
-                    .when(signed_in, |this| {
-                        this.child(
-                            div()
-                                .child(ui::Chip::new("signed in"))
-                                .visible_on_hover("telemetry-entry"),
-                        )
-                    }),
+                    .child(Label::new(event_type).buffer_font(cx).color(Color::Default)),
             )
             .when_some(params_md, |this, params| {
                 this.child(

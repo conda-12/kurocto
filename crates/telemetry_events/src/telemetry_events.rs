@@ -10,13 +10,8 @@ pub struct EventRequestBody {
     pub system_id: Option<String>,
     /// Identifier unique to each Zed installation (differs for stable, preview, dev)
     pub installation_id: Option<String>,
-    /// Identifier unique to each logged in Zed user (randomly generated on first sign in)
     /// Identifier unique to each Zed session (differs for each time you open Zed)
     pub session_id: Option<String>,
-    pub metrics_id: Option<String>,
-    /// True for Zed staff, otherwise false
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub is_staff: Option<bool>,
     /// Zed version number
     pub app_version: String,
     pub os_name: String,
@@ -35,6 +30,8 @@ impl EventRequestBody {
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct EventWrapper {
+    /// Always `false`: there are no accounts. The field stays because it is a
+    /// required part of the telemetry wire format and of existing telemetry logs.
     pub signed_in: bool,
     /// Duration between this event's timestamp and the timestamp of the first event in the current batch
     pub milliseconds_since_first_event: i64,

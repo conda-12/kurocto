@@ -192,7 +192,6 @@ impl VsCodeSettings {
                     use_command_history: Some(history > 0),
                 }),
             copilot: None,
-            credentials_url: None,
             debugger: None,
             diagnostics: None,
             editor: self.editor_settings_content(),
