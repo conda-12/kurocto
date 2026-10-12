@@ -20,7 +20,6 @@ guppy = "0.18"
 indoc.workspace = true
 indexmap.workspace = true
 itertools.workspace = true
-regex = { workspace = true, features = ["unicode-perl"] }
 serde.workspace = true
 serde_json.workspace = true
 serde_yaml = "0.9.34"

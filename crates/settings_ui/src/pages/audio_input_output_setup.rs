@@ -1,33 +1,29 @@
 use audio::{AudioDeviceInfo, AvailableAudioDevices};
 use cpal::DeviceId;
 use gpui::{AnyElement, App, ElementId, ReadGlobal, SharedString, Window};
-use settings::{AudioInputDeviceName, AudioOutputDeviceName, SettingsStore};
+use settings::{AudioOutputDeviceName, SettingsStore};
 use std::str::FromStr;
 use ui::{ContextMenu, DropdownMenu, DropdownStyle, FluentBuilder, IconPosition, IntoElement};
 use util::ResultExt;
 
 use crate::{SettingField, SettingsFieldMetadata, SettingsUiFile, update_settings_file};
 
-pub(crate) const SYSTEM_DEFAULT: &str = "System Default";
+const SYSTEM_DEFAULT: &str = "System Default";
 
-pub(crate) fn get_current_device(
+fn get_current_device(
     current_id: Option<&DeviceId>,
-    is_input: bool,
     devices: &[AudioDeviceInfo],
 ) -> Option<AudioDeviceInfo> {
-    let Some(current_id) = current_id else {
-        return None;
-    };
+    let current_id = current_id?;
     devices
         .iter()
-        .find(|d| d.matches(current_id, is_input))
+        .find(|device| device.matches_output(current_id))
         .cloned()
 }
 
-pub(crate) fn render_audio_device_dropdown<F>(
+fn render_audio_device_dropdown<F>(
     dropdown_id: impl Into<ElementId>,
     current_device_id: Option<DeviceId>,
-    is_input: bool,
     on_select: F,
     aria_label: Option<SharedString>,
     aria_description: Option<SharedString>,
@@ -39,7 +35,7 @@ where
 {
     audio::ensure_devices_initialized(cx);
     let devices = cx.global::<AvailableAudioDevices>().0.clone();
-    let current_device = get_current_device(current_device_id.as_ref(), is_input, &devices);
+    let current_device = get_current_device(current_device_id.as_ref(), &devices);
 
     let menu = ContextMenu::build(window, cx, {
         let current_device = current_device.clone();
@@ -58,10 +54,10 @@ where
                 },
             );
 
-            for device in devices.iter().filter(|d| d.matches_input(is_input)) {
+            for device in devices.iter().filter(|device| device.supports_output()) {
                 let is_current = current_device
                     .as_ref()
-                    .map(|info| info.matches(&device.id, is_input))
+                    .map(|info| info.matches_output(&device.id))
                     .unwrap_or(false);
                 let device_id = device.id.clone();
 
@@ -98,32 +94,26 @@ where
     .into_any_element()
 }
 
-fn render_settings_audio_device_dropdown<T: AsRef<Option<String>> + From<Option<String>> + Send>(
-    field: SettingField<T>,
+pub fn render_output_audio_device_dropdown(
+    field: SettingField<AudioOutputDeviceName>,
     file: SettingsUiFile,
-    is_input: bool,
+    _metadata: Option<&SettingsFieldMetadata>,
     title: &'static str,
     description: &'static str,
     window: &mut Window,
     cx: &mut App,
 ) -> AnyElement {
-    let (_, current_value): (_, Option<&T>) =
+    let (_, current_value): (_, Option<&AudioOutputDeviceName>) =
         SettingsStore::global(cx).get_value_from_file(file.to_settings(), field.pick);
-    let current_device_id =
-        current_value.and_then(|x| x.as_ref().clone().and_then(|x| DeviceId::from_str(&x).ok()));
-
-    let dropdown_id: SharedString = if is_input {
-        "input-audio-device-dropdown".into()
-    } else {
-        "output-audio-device-dropdown".into()
-    };
+    let current_device_id = current_value
+        .and_then(|name| name.0.as_ref())
+        .and_then(|id| DeviceId::from_str(id).ok());
 
     render_audio_device_dropdown(
-        dropdown_id,
+        "output-audio-device-dropdown",
         current_device_id,
-        is_input,
         move |device_id, window, cx| {
-            let value: Option<T> = device_id.map(|id| T::from(Some(id.to_string())));
+            let value = device_id.map(|id| AudioOutputDeviceName(Some(id.to_string())));
             update_settings_file(
                 file.clone(),
                 field.json_path,
@@ -140,28 +130,4 @@ fn render_settings_audio_device_dropdown<T: AsRef<Option<String>> + From<Option<
         window,
         cx,
     )
-}
-
-pub fn render_input_audio_device_dropdown(
-    field: SettingField<AudioInputDeviceName>,
-    file: SettingsUiFile,
-    _metadata: Option<&SettingsFieldMetadata>,
-    title: &'static str,
-    description: &'static str,
-    window: &mut Window,
-    cx: &mut App,
-) -> AnyElement {
-    render_settings_audio_device_dropdown(field, file, true, title, description, window, cx)
-}
-
-pub fn render_output_audio_device_dropdown(
-    field: SettingField<AudioOutputDeviceName>,
-    file: SettingsUiFile,
-    _metadata: Option<&SettingsFieldMetadata>,
-    title: &'static str,
-    description: &'static str,
-    window: &mut Window,
-    cx: &mut App,
-) -> AnyElement {
-    render_settings_audio_device_dropdown(field, file, false, title, description, window, cx)
 }

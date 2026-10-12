@@ -79,10 +79,6 @@ let
     in
     builtins.elem firstComp topLevelIncludes;
 
-  corgiPatches = builtins.path {
-    path = ../tooling/corgi/patches;
-    name = "corgi-patches";
-  };
   craneLib = crane.overrideToolchain rustToolchain;
   gpu-lib = if withGLES then libglvnd else vulkan-loader;
   commonArgs =
@@ -238,14 +234,6 @@ let
         };
         RELEASE_VERSION = version;
         ZED_COMMIT_SHA = lib.optionalString (commitSha != null) "${commitSha}";
-        LK_CUSTOM_WEBRTC = pkgs.livekit-libwebrtc.overrideAttrs (
-          old:
-          lib.optionalAttrs stdenv'.hostPlatform.isLinux {
-            # Wayland capture dlopens EGL/GL, so fixup would otherwise remove their search path.
-            NIX_LDFLAGS = (old.NIX_LDFLAGS or "") + " -rpath ${lib.makeLibraryPath [ libglvnd ]}";
-            dontPatchELF = true;
-          }
-        );
         PROTOC = "${protobuf}/bin/protoc";
 
         CARGO_PROFILE = profile;
@@ -279,61 +267,9 @@ let
 
       cargoVendorDir = craneLib.vendorCargoDeps {
         inherit src cargoLock;
-        overrideVendorGitCheckout =
-          let
-            hasWebRtcSys = builtins.any (crate: crate.name == "webrtc-sys");
-            # we can't set $RUSTFLAGS because that clobbers the cargo config
-            # see https://github.com/rust-lang/cargo/issues/5376#issuecomment-2163350032
-            glesConfig = builtins.toFile "config.toml" ''
-              [target.'cfg(all())']
-              rustflags = ["--cfg", "gles"]
-            '';
-
-            # `webrtc-sys` expects a staticlib; nixpkgs' `livekit-webrtc` has been patched to
-            # produce a `dylib`... patching `webrtc-sys`'s build script is the easier option
-            # TODO: send livekit sdk a PR to make this configurable
-            postPatch = ''
-              substituteInPlace webrtc-sys/build.rs --replace-fail \
-                "cargo:rustc-link-lib=static=webrtc" "cargo:rustc-link-lib=dylib=webrtc"
-
-              substituteInPlace webrtc-sys/build.rs --replace-fail \
-                'add_gio_headers(&mut builder);' \
-                'for lib_name in ["glib-2.0", "gio-2.0"] {
-                    if let Ok(lib) = pkg_config::Config::new().cargo_metadata(false).probe(lib_name) {
-                        for path in lib.include_paths {
-                            builder.include(&path);
-                        }
-                    }
-                }'
-            ''
-            + lib.optionalString withGLES ''
-              cat ${glesConfig} >> .cargo/config/config.toml
-            '';
-          in
-          crates: drv:
-          if hasWebRtcSys crates then
-            drv.overrideAttrs (o: {
-              postPatch = (o.postPatch or "") + postPatch;
-            })
-          else
-            drv;
       };
     };
-  cargoArtifacts = craneLib.buildDepsOnly (
-    builtins.removeAttrs commonArgs [ "src" ]
-    // {
-      dummySrc = craneLib.mkDummySrc {
-        inherit (commonArgs) src cargoLock;
-        # `scratch` is a local dependency of `cxx-build`, so its API is needed
-        # while Crane builds third-party dependencies.
-        extraDummyScript = ''
-          rm -rf $out/tooling/corgi/patches
-          mkdir -p $out/tooling/corgi
-          cp --recursive ${corgiPatches} $out/tooling/corgi/patches
-        '';
-      };
-    }
-  );
+  cargoArtifacts = craneLib.buildDepsOnly commonArgs;
 in
 craneLib.buildPackage (
   lib.recursiveUpdate commonArgs {
