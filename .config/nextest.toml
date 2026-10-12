@@ -36,7 +36,7 @@ filter = 'package(vim) and (test(test_command_read) or test(test_capital_f_and_c
 slow-timeout = { period = "300s", terminate-after = 1 }
 
 [[profile.default.overrides]]
-filter =  'package(editor) and test(test_random_split_editor)'
+filter =  'package(editor) and (test(test_random_split_editor) or test(test_random_columnar_selections))'
 slow-timeout = { period = "300s", terminate-after = 1 }
 
 [[profile.default.overrides]]
