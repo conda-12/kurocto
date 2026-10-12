@@ -246,54 +246,30 @@ impl WslRemoteConnection {
             .await
             .is_ok();
 
-        #[cfg(any(debug_assertions, feature = "build-remote-server-binary"))]
-        if let Some(remote_server_path) = super::build_remote_server_from_source(
+        let Some(remote_server_path) = super::local_server_binary(
             &self.platform,
             delegate.as_ref(),
             binary_exists_on_server,
+            &dst_path,
             cx,
         )
         .await?
-        {
-            let tmp_path = paths::remote_server_dir_relative().join(
-                &RelPath::from_unix_str(&format!(
-                    "download-{}-{}",
-                    std::process::id(),
-                    remote_server_path.file_name().unwrap().to_string_lossy()
-                ))
-                .unwrap(),
-            );
-            self.upload_file(&remote_server_path, &tmp_path, delegate, cx)
-                .await?;
-            self.extract_and_install(&tmp_path, &dst_path, delegate, cx)
-                .await?;
+        else {
             return Ok(dst_path.into());
-        }
-
-        if binary_exists_on_server {
-            return Ok(dst_path.into());
-        }
-
-        let wanted_version = match release_channel {
-            ReleaseChannel::Nightly | ReleaseChannel::Dev => None,
-            _ => Some(cx.update(|cx| AppVersion::global(cx))),
         };
 
-        let src_path = delegate
-            .download_server_binary_locally(self.platform, release_channel, wanted_version, cx)
-            .await?;
-
-        let tmp_path = format!(
-            "{}.{}.gz",
-            dst_path.display(PathStyle::Unix),
-            std::process::id()
+        let tmp_path = paths::remote_server_dir_relative().join(
+            &RelPath::from_unix_str(&format!(
+                "download-{}-{}",
+                std::process::id(),
+                remote_server_path.file_name().unwrap().to_string_lossy()
+            ))
+            .unwrap(),
         );
-        let tmp_path = RelPath::from_unix_str(&tmp_path).unwrap();
-
-        self.upload_file(&src_path, &tmp_path, delegate, cx).await?;
+        self.upload_file(&remote_server_path, &tmp_path, delegate, cx)
+            .await?;
         self.extract_and_install(&tmp_path, &dst_path, delegate, cx)
             .await?;
-
         Ok(dst_path.into())
     }
 

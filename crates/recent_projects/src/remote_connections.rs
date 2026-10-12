@@ -51,7 +51,6 @@ impl RemoteSettings {
                 && conn.port == options.port
             {
                 options.nickname = conn.nickname;
-                options.upload_binary_over_ssh = conn.upload_binary_over_ssh.unwrap_or_default();
                 options.args = Some(conn.args);
                 options.port_forwards = conn.port_forwards;
                 break;
@@ -93,7 +92,6 @@ impl From<Connection> for RemoteConnectionOptions {
                     name: conn.name,
                     remote_user: conn.remote_user,
                     container_id: conn.container_id,
-                    upload_binary_over_docker_exec: false,
                     use_podman: conn.use_podman,
                     remote_env: conn.remote_env,
                 })

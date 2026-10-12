@@ -112,6 +112,9 @@ use zed_actions::{
 const DOCS_URL: &str = "https://zed.dev/docs/";
 const STATUS_URL: &str = "https://status.zed.dev";
 const MERCH_URL: &str = "https://merch.zed.dev/";
+const MANUAL_UPDATE_MESSAGE: &str = "This build does not update itself.";
+const MANUAL_UPDATE_DETAIL: &str =
+    "It does not check for or download updates. New versions are installed manually.";
 
 pub struct CrashHandler(pub Arc<crashes::Client>);
 
@@ -324,6 +327,19 @@ pub fn init(cx: &mut App) {
     })
     .on_action(|_: &About, cx| {
         open_about_window(cx);
+    })
+    .on_action(check_for_updates);
+}
+
+fn check_for_updates(_: &zed_actions::CheckForUpdates, cx: &mut App) {
+    with_active_or_new_workspace(cx, |_workspace, window, cx| {
+        drop(window.prompt(
+            PromptLevel::Info,
+            MANUAL_UPDATE_MESSAGE,
+            Some(MANUAL_UPDATE_DETAIL),
+            &["OK"],
+            cx,
+        ));
     });
 }
 
@@ -2849,7 +2865,7 @@ mod tests {
         Action, AnyWindowHandle, App, AssetSource, BorrowAppContext, Modifiers, OwnedMenuItem,
         TestAppContext, UpdateGlobal, VisualTestContext, WindowHandle, actions, point, px,
     };
-    use http_client::BlockedHttpClient;
+    use http_client::{BlockedHttpClient, FakeHttpClient};
     use language::LanguageRegistry;
     use languages::{markdown_lang, rust_lang};
     use node_runtime::NodeRuntime;
@@ -5867,7 +5883,6 @@ mod tests {
                 "app_menu",
                 "assistant",
                 "assistant2",
-                "auto_update",
                 "branch_picker",
                 "bedrock",
                 "branches",
@@ -8254,6 +8269,126 @@ mod tests {
                 "expected Diagnostics to remain in the View menu"
             );
         });
+    }
+
+    fn collect_action_item_names(items: &[OwnedMenuItem], names: &mut Vec<String>) {
+        for item in items {
+            match item {
+                OwnedMenuItem::Action { name, .. } => names.push(name.clone()),
+                OwnedMenuItem::Submenu(submenu) => collect_action_item_names(&submenu.items, names),
+                OwnedMenuItem::Separator | OwnedMenuItem::SystemMenu(_) => {}
+            }
+        }
+    }
+
+    #[gpui::test]
+    fn test_app_menus_offer_manual_update_check_but_no_release_notes(cx: &mut TestAppContext) {
+        init_keymap_test(cx);
+
+        cx.update(|cx| reload_keymaps(cx, Vec::new()));
+        cx.update(|cx| {
+            let menus = cx
+                .get_menus()
+                .expect("reload_keymaps should populate the menu bar");
+            let mut item_names = Vec::new();
+            for menu in &menus {
+                collect_action_item_names(&menu.items, &mut item_names);
+            }
+
+            assert_eq!(
+                item_names
+                    .iter()
+                    .filter(|name| name.as_str() == "Check for Updates")
+                    .count(),
+                1,
+                "expected exactly one update menu item"
+            );
+            let release_notes_items = item_names
+                .iter()
+                .filter(|name| name.to_lowercase().contains("release notes"))
+                .collect::<Vec<_>>();
+            assert_eq!(release_notes_items, Vec::<&String>::new());
+
+            let release_notes_actions = cx
+                .all_action_names()
+                .iter()
+                .filter(|name| {
+                    name.to_lowercase()
+                        .replace('_', "")
+                        .contains("releasenotes")
+                })
+                .collect::<Vec<_>>();
+            assert_eq!(release_notes_actions, Vec::<&&str>::new());
+        });
+    }
+
+    #[gpui::test]
+    async fn test_check_for_updates_explains_manual_updates_without_requests(
+        cx: &mut TestAppContext,
+    ) {
+        let requested_urls = Arc::new(parking_lot::Mutex::new(Vec::<String>::new()));
+        let http_client = FakeHttpClient::create({
+            let requested_urls = requested_urls.clone();
+            move |request| {
+                requested_urls.lock().push(request.uri().to_string());
+                async move { anyhow::bail!("no request is expected") }
+            }
+        });
+        let app_state = cx.update(|cx| {
+            cx.set_http_client(http_client.clone());
+            let mut app_state = AppState::test(cx);
+            let state = Arc::get_mut(&mut app_state).expect("app state is not shared yet");
+            let client = client::Client::new(
+                Arc::new(clock::FakeSystemClock::new()),
+                http_client.clone(),
+                cx,
+            );
+            state.user_store = cx.new(|cx| client::UserStore::new(client.clone(), cx));
+            state.workspace_store = cx.new(|cx| workspace::WorkspaceStore::new(client.clone(), cx));
+            state.client = client;
+
+            // The full test setup also starts language model and agent
+            // registry discovery, which make requests of their own.
+            AppState::set_global(app_state.clone(), cx);
+            workspace::init(app_state.clone(), cx);
+            cx.on_action(check_for_updates);
+            app_state
+        });
+
+        cx.update(|cx| open_new(Default::default(), app_state.clone(), cx, |_, _, _| {}))
+            .await
+            .expect("failed to open a workspace");
+        cx.run_until_parked();
+        let window = cx
+            .update(|cx| {
+                cx.windows()
+                    .first()
+                    .and_then(|window| window.downcast::<MultiWorkspace>())
+            })
+            .expect("expected a workspace window");
+        window
+            .update(cx, |_, window, _| window.activate_window())
+            .expect("workspace window was closed");
+        cx.run_until_parked();
+
+        cx.dispatch_action(*window, zed_actions::CheckForUpdates);
+        cx.run_until_parked();
+        assert_eq!(
+            cx.pending_prompt(),
+            Some((
+                MANUAL_UPDATE_MESSAGE.to_string(),
+                MANUAL_UPDATE_DETAIL.to_string()
+            ))
+        );
+
+        // Longer than any interval the removed updater polled on.
+        cx.executor()
+            .advance_clock(Duration::from_secs(2 * 60 * 60));
+        cx.run_until_parked();
+        cx.simulate_prompt_answer("OK");
+        cx.run_until_parked();
+
+        assert_eq!(*requested_urls.lock(), Vec::<String>::new());
     }
 
     fn has_view_item(cx: &mut App, item_name: &str) -> bool {

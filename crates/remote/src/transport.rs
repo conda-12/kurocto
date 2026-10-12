@@ -1,4 +1,4 @@
-use std::io::Write;
+use std::{ffi::OsString, io::Write, path::PathBuf};
 
 use crate::{
     RemoteArch, RemoteOs, RemotePlatform,
@@ -12,7 +12,7 @@ use futures::{
 };
 use gpui::{AppContext as _, AsyncApp, Task};
 use rpc::proto::Envelope;
-use util::command::Child;
+use util::{command::Child, rel_path::RelPath};
 
 pub mod docker;
 #[cfg(any(test, feature = "test-support"))]
@@ -258,27 +258,79 @@ fn handle_rpc_messages_over_child_process_stdio(
     })
 }
 
+/// Returns the local server binary to upload to the remote host, or `None`
+/// when the binary that already exists on the remote host should be used.
+async fn local_server_binary(
+    platform: &RemotePlatform,
+    delegate: &dyn crate::RemoteClientDelegate,
+    binary_exists_on_server: bool,
+    destination_path: &RelPath,
+    cx: &mut AsyncApp,
+) -> Result<Option<PathBuf>> {
+    let local_binary = match supplied_server_binary(std::env::var_os("ZED_COPY_REMOTE_SERVER")) {
+        Some(path) => Some(path),
+        None => {
+            build_remote_server_from_source(platform, delegate, binary_exists_on_server, cx).await?
+        }
+    };
+    select_server_binary(
+        local_binary,
+        binary_exists_on_server,
+        platform,
+        destination_path,
+    )
+}
+
+fn supplied_server_binary(configured_path: Option<OsString>) -> Option<PathBuf> {
+    let path = PathBuf::from(configured_path?);
+    if path.exists() {
+        Some(path)
+    } else {
+        log::warn!(
+            "ZED_COPY_REMOTE_SERVER path does not exist: {}",
+            path.display()
+        );
+        None
+    }
+}
+
+fn select_server_binary(
+    local_binary: Option<PathBuf>,
+    binary_exists_on_server: bool,
+    platform: &RemotePlatform,
+    destination_path: &RelPath,
+) -> Result<Option<PathBuf>> {
+    anyhow::ensure!(
+        local_binary.is_some() || binary_exists_on_server,
+        "No remote server binary exists at {destination_path:?} on the remote host, and this build \
+         does not download one. Set ZED_COPY_REMOTE_SERVER to the path of a remote server binary \
+         built for {} {}, or use a debug build or a build with the `build-remote-server-binary` \
+         feature, which builds it from source (see ZED_BUILD_REMOTE_SERVER).",
+        platform.os,
+        platform.arch,
+    );
+    Ok(local_binary)
+}
+
+#[cfg(not(any(debug_assertions, feature = "build-remote-server-binary")))]
+async fn build_remote_server_from_source(
+    _platform: &RemotePlatform,
+    _delegate: &dyn crate::RemoteClientDelegate,
+    _binary_exists_on_server: bool,
+    _cx: &mut AsyncApp,
+) -> Result<Option<PathBuf>> {
+    Ok(None)
+}
+
 #[cfg(any(debug_assertions, feature = "build-remote-server-binary"))]
 async fn build_remote_server_from_source(
-    platform: &crate::RemotePlatform,
+    platform: &RemotePlatform,
     delegate: &dyn crate::RemoteClientDelegate,
     binary_exists_on_server: bool,
     cx: &mut AsyncApp,
-) -> Result<Option<std::path::PathBuf>> {
+) -> Result<Option<PathBuf>> {
     use std::env::VarError;
     use util::command::{Command, Stdio, new_command};
-
-    if let Ok(path) = std::env::var("ZED_COPY_REMOTE_SERVER") {
-        let path = std::path::PathBuf::from(path);
-        if path.exists() {
-            return Ok(Some(path));
-        } else {
-            log::warn!(
-                "ZED_COPY_REMOTE_SERVER path does not exist, falling back to ZED_BUILD_REMOTE_SERVER: {}",
-                path.display()
-            );
-        }
-    }
 
     // By default, we make building remote server from source opt-out and we do not force artifact compression
     // for quicker builds.
@@ -546,6 +598,83 @@ async fn which(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    const LINUX_PLATFORM: RemotePlatform = RemotePlatform {
+        os: RemoteOs::Linux,
+        arch: RemoteArch::X86_64,
+    };
+
+    #[test]
+    fn test_supplied_server_binary_requires_existing_path() -> Result<()> {
+        let directory = tempfile::tempdir()?;
+        let binary_path = directory.path().join("zed-remote-server.gz");
+        std::fs::write(&binary_path, b"binary")?;
+
+        assert_eq!(
+            supplied_server_binary(Some(binary_path.clone().into_os_string())),
+            Some(binary_path)
+        );
+        assert_eq!(
+            supplied_server_binary(Some(directory.path().join("missing").into_os_string())),
+            None
+        );
+        assert_eq!(supplied_server_binary(None), None);
+        Ok(())
+    }
+
+    #[test]
+    fn test_select_server_binary() -> Result<()> {
+        let destination_path =
+            RelPath::from_unix_str(".zed_server/zed-remote-server-stable-1.0.0")?;
+        let local_binary = PathBuf::from("/tmp/zed-remote-server.gz");
+
+        assert_eq!(
+            select_server_binary(
+                Some(local_binary.clone()),
+                false,
+                &LINUX_PLATFORM,
+                destination_path
+            )?,
+            Some(local_binary.clone())
+        );
+        assert_eq!(
+            select_server_binary(
+                Some(local_binary.clone()),
+                true,
+                &LINUX_PLATFORM,
+                destination_path
+            )?,
+            Some(local_binary)
+        );
+        assert_eq!(
+            select_server_binary(None, true, &LINUX_PLATFORM, destination_path)?,
+            None
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn test_select_server_binary_reports_how_to_supply_a_binary() -> Result<()> {
+        let destination_path =
+            RelPath::from_unix_str(".zed_server/zed-remote-server-stable-1.0.0")?;
+
+        let Err(error) = select_server_binary(None, false, &LINUX_PLATFORM, destination_path)
+        else {
+            anyhow::bail!("expected an error when no server binary is available");
+        };
+        let message = error.to_string();
+
+        assert!(
+            message.contains("zed-remote-server-stable-1.0.0"),
+            "{message}"
+        );
+        assert!(message.contains("linux x86_64"), "{message}");
+        assert!(message.contains("ZED_COPY_REMOTE_SERVER"), "{message}");
+        assert!(message.contains("ZED_BUILD_REMOTE_SERVER"), "{message}");
+        assert!(message.contains("build-remote-server-binary"), "{message}");
+        assert!(message.contains("does not download"), "{message}");
+        Ok(())
+    }
 
     #[test]
     fn test_parse_platform() {
