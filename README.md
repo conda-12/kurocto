@@ -1,10 +1,5 @@
-> [!IMPORTANT]
-> Remove this line to confirm you've reviewed this PR before submitting.
 # Kurocto
-Kurocto is a code editor. It is a modified version of [Zed](https://github.com/zed-industries/zed), which is developed by Zed Industries, Inc.
-Kurocto is an independent project. It is not an official Zed release, and it does not use Zed accounts or Zed-operated services.
-
----
+Kurocto is a code editor. It is a modified version of [Zed](https://github.com/zed-industries/zed), which is developed by Zed Industries, Inc.Kurocto is an independent project. It is not an official Zed release, and it does not use Zed accounts or Zed-operated services.---
 
 ### Relationship to Zed
 
