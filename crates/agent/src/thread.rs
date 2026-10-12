@@ -66,8 +66,8 @@ use std::{
     time::{Duration, Instant},
 };
 use util::{ResultExt, debug_panic, markdown::MarkdownCodeBlock, paths::PathStyle};
-use web_search::WebSearchRegistry;
 use uuid::Uuid;
+use web_search::WebSearchRegistry;
 
 const TOOL_CANCELED_MESSAGE: &str = "Tool canceled by user";
 const TOOL_CALL_INTERRUPTED_BY_FOLLOW_UP_MESSAGE: &str =

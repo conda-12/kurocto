@@ -98,7 +98,6 @@ impl LanguageModel {
     pub fn is_same_as(&self, other: &LanguageModel) -> bool {
         self.id == other.id && self.provider_id == other.provider_id
     }
-
 }
 
 pub enum Event {

@@ -1514,9 +1514,7 @@ impl Render for TerminalPanel {
                         None,
                         &workspace::PaneRenderContext {
                             follower_states: &HashMap::default(),
-                            active_call: workspace.active_call(),
                             active_pane: &self.active_pane,
-                            app_state: workspace.app_state(),
                             project: workspace.project(),
                             workspace: &workspace.weak_handle(),
                         },

@@ -233,7 +233,6 @@ pub enum LanguageModelCompletionError {
 }
 
 impl LanguageModelCompletionError {
-
     pub fn from_http_status(
         provider: LanguageModelProviderName,
         status_code: StatusCode,
